@@ -83,6 +83,12 @@ Data processing (/lib/dataProcessor.ts)
   - Overlay a constant line for "Expected completion tasks" from env var NEXT_EXPECTED_COMPLETION_TASKS (e.g. 3 tasks per week)
   - fill data 52 weeks from last year to current week with 0 for better chart display.
 
+Supabase library 
+- client.ts: initialize Supabase client with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (server-side only).
+- server.ts: initialize Supabase client with `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` (for client-side use).
+- middleware.ts: handle auth session from cookies and attach to request context.
+- utils.ts: helper functions for auth, e.g. getUserRole(uid), getUserAssignee(uid).
+
 Storage and sync (/lib/storage.ts)
 - This file describes storing data from Asana into Supabase using a "1 Class Model = 1 Table" approach and includes a special table `sync_metadata` to store the `updated_at` of the last sync.
 - Recommended schema:
