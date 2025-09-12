@@ -35,6 +35,9 @@ CREATE TABLE subtasks (
 
 CREATE TABLE sync_metadata (
     key TEXT PRIMARY KEY,
+    message TEXT,
+    status TEXT,
+    record_count INT,
     updated_at TIMESTAMP
 );
 
