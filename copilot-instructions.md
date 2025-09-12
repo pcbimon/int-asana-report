@@ -94,7 +94,7 @@ Pages & routing
 - /Auth/login — simple login form (use env vars for test user).
 - /Auth/logout — clear session and redirect to login.
 - 404 page for unknown assignees.
-- /auth/invite#access_token=... for create new user to access dashboard. validate token and create user password from supabase invite user by email and redirect to login.
+- /auth/invite#access_token=... for create new user to access dashboard. validate token and create user password from `supabase` invite user by email and redirect to login. super admin can invite user from supabase dashboard.
 - /auth/forgot-password for reset password form. send reset email from supabase auth.
 
 UI & Components
