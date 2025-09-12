@@ -112,8 +112,10 @@ function generateWeeklyTimeseries(
   
   if (!start || !end) {
     const now = dayjs().utc();
-    end = now.format('YYYY-[W]WW');
-    start = now.subtract(52, 'week').format('YYYY-[W]WW');
+    // Build week strings manually to avoid formatting quirks producing extra 'W' characters
+    end = `${now.year()}-W${String(now.isoWeek()).padStart(2, '0')}`;
+    const startDate = now.subtract(52, 'week');
+    start = `${startDate.year()}-W${String(startDate.isoWeek()).padStart(2, '0')}`;
   }
   
   // Generate complete range with zeros for missing weeks

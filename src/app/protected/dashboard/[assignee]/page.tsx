@@ -92,7 +92,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     // Find the assignee
     const allAssignees = report.getAllAssignees();
     const assignee = allAssignees.find(a => a.gid === assigneeGid);
-    
     if (!assignee) {
       notFound();
     }
@@ -179,9 +178,10 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
 // Generate metadata for the page
 export async function generateMetadata({ params }: DashboardPageProps) {
   const assigneeGid = decodeURIComponent(params.assignee);
-  
+  console.log(`Generating metadata for assigneeGid: ${assigneeGid}`);
   try {
     const report = await loadReport();
+    console.log(report.getAllAssignees()[0])
     const assignee = report.getAllAssignees().find(a => a.gid === assigneeGid);
     
     return {

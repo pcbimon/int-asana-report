@@ -316,7 +316,6 @@ export async function loadReport(): Promise<AsanaReport> {
       const assignee = rowToAssignee(row as AssigneeRow);
       assigneeMap.set(assignee.gid, assignee);
     });
-    
     // Create subtask lookup map by parent task
     const subtasksByTask = new Map<string, Subtask[]>();
     (subtaskData || []).forEach(row => {
@@ -329,7 +328,7 @@ export async function loadReport(): Promise<AsanaReport> {
       }
       subtasksByTask.get(subtask.parent_task_gid || '')!.push(subtask);
     });
-    
+    console.log('Subtasks mapped to parent tasks.');
     // Create task lookup map by section
     const tasksBySection = new Map<string, Task[]>();
     (taskData || []).forEach(row => {
@@ -352,10 +351,9 @@ export async function loadReport(): Promise<AsanaReport> {
       section.tasks = tasksBySection.get(section.gid) || [];
       return section;
     });
-    
     const duration = Date.now() - startTime;
     console.log(`loadReport completed in ${duration}ms`);
-    
+    console.log(`Total unique assignees in report: ${assigneeMap.size}`);
     return new AsanaReport(sections);
     
   } catch (error) {
