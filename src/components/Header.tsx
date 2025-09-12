@@ -4,8 +4,7 @@
  */
 
 import { Assignee } from '@/models/asanaReport';
-import { Button } from '@/components/ui/button';
-import { ExportButtons } from './ExportButtons';
+import { ExportButtons } from '@/components/ExportButtons';
 
 interface HeaderProps {
   assignee: Assignee;

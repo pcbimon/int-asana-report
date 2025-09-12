@@ -29,6 +29,7 @@ interface DashboardClientProps {
   availableSections: string[];
   userRole: string | null;
   isAdmin: boolean;
+  lastSyncTime: string | null;
 }
 
 export function DashboardClient({
@@ -39,6 +40,7 @@ export function DashboardClient({
   availableSections,
   userRole,
   isAdmin,
+  lastSyncTime,
 }: DashboardClientProps) {
   const [filters, setFilters] = useState<FilterOptions>({});
   const [isExporting, setIsExporting] = useState(false);
@@ -53,7 +55,27 @@ export function DashboardClient({
     // For now, return the original metrics
     // In the future, this could be enhanced to apply filters to metrics
     return metrics;
-  }, [metrics, filters]);
+  }, [metrics]); // Removed 'filters' dependency as it's not used in the function
+
+  // Get available assignees from sections
+  const availableAssignees = useMemo(() => {
+    const assignees = new Map<string, { gid: string; name: string }>();
+    
+    sections.forEach(section => {
+      section.tasks.forEach(task => {
+        task.subtasks?.forEach(subtask => {
+          if (subtask.assignee) {
+            assignees.set(subtask.assignee.gid, {
+              gid: subtask.assignee.gid,
+              name: subtask.assignee.name,
+            });
+          }
+        });
+      });
+    });
+    
+    return Array.from(assignees.values());
+  }, [sections]);
 
   // Handle PDF export
   const handleExportPDF = async () => {
@@ -199,6 +221,13 @@ export function DashboardClient({
                 'User'
               )}
             </Badge>
+
+            {lastSyncTime && (
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <RefreshCw className="w-3 h-3" />
+                <span>Last synced: {new Date(lastSyncTime).toLocaleString()}</span>
+              </div>
+            )}
 
             {isAdmin && (
               <div className="flex items-center space-x-2">

@@ -4,7 +4,7 @@
  */
 
 import axios, { AxiosResponse, AxiosError } from 'axios';
-import { Section, Task, Subtask, Assignee } from '@/models/asanaReport';
+import { Section, Task, Subtask } from '@/models/asanaReport';
 
 // API Configuration
 const BASE_URL = process.env.ASANA_BASE_URL || 'https://app.asana.com/api/1.0';

@@ -59,14 +59,14 @@ export function WeeklySummaryChart({
             backgroundColor: '#6a7985',
           },
         },
-        formatter: function (params: any) {
+        formatter: function (params: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
           if (!Array.isArray(params)) return '';
           
           const weekData = params[0];
           const week = weekData.axisValue;
-          const assigned = params.find((p: any) => p.seriesName === 'Assigned')?.value || 0;
-          const completed = params.find((p: any) => p.seriesName === 'Completed')?.value || 0;
-          const expected = params.find((p: any) => p.seriesName === 'Expected')?.value || 0;
+          const assigned = params.find((p: any) => p.seriesName === 'Assigned')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
+          const completed = params.find((p: any) => p.seriesName === 'Completed')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
+          const expected = params.find((p: any) => p.seriesName === 'Expected')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
           
           return `
             <div style="padding: 8px;">

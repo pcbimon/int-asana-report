@@ -6,8 +6,8 @@
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/server';
-import { loadReport, hasData, getUserRole, getUserAssignee } from '@/lib/storage';
-import { processAsanaReport, getAssigneeMetrics } from '@/lib/dataProcessor';
+import { loadReport, hasData, getUserRole, getUserAssignee, getLastUpdated } from '@/lib/storage';
+import { getAssigneeMetrics } from '@/lib/dataProcessor';
 import { DashboardClient } from './DashboardClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
@@ -37,7 +37,7 @@ function DashboardSkeleton() {
   );
 }
 
-export default async function DashboardPage({ params, searchParams }: DashboardPageProps) {
+export default async function DashboardPage({ params }: DashboardPageProps) {
   const assigneeGid = decodeURIComponent(params.assignee);
 
   try {
@@ -128,6 +128,10 @@ export default async function DashboardPage({ params, searchParams }: DashboardP
 
     const availableSections = report.sections.map(section => section.name);
 
+    // Get last sync time
+    const lastSyncMetadata = await getLastUpdated();
+    const lastSyncTime = lastSyncMetadata?.lastUpdated || null;
+
     // Pass data to client component
     return (
       <Suspense fallback={<DashboardSkeleton />}>
@@ -139,6 +143,7 @@ export default async function DashboardPage({ params, searchParams }: DashboardP
           availableSections={availableSections}
           userRole={userRole}
           isAdmin={userRole === 'admin'}
+          lastSyncTime={lastSyncTime}
         />
       </Suspense>
     );

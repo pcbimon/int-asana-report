@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/server';
 import { getUserRole, getLastUpdated } from '@/lib/storage';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Check authentication
     const supabase = await createClient();

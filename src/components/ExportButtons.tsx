@@ -24,7 +24,7 @@ export function ExportButtons({ onExportPDF, onExportExcel, disabled = false }: 
         <FileText className="w-4 h-4" />
         <span>Export PDF</span>
       </Button>
-      
+
       <Button
         variant="outline"
         size="sm"

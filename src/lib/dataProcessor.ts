@@ -400,12 +400,12 @@ export function validateReportData(report: AsanaReport): {
   let subtasksWithoutAssignees = 0;
   let subtasksWithoutCreatedDate = 0;
   
-  report.sections.forEach((section, sectionIndex) => {
+  report.sections.forEach((section, _sectionIndex) => {
     if (section.tasks.length === 0) {
       warnings.push(`Section "${section.name}" has no tasks`);
     }
     
-    section.tasks.forEach((task, taskIndex) => {
+    section.tasks.forEach((task, _taskIndex) => {
       totalTasks++;
       
       if (!task.subtasks || task.subtasks.length === 0) {
@@ -413,7 +413,7 @@ export function validateReportData(report: AsanaReport): {
         return;
       }
       
-      task.subtasks.forEach((subtask, subtaskIndex) => {
+      task.subtasks.forEach((subtask, _subtaskIndex) => {
         totalSubtasks++;
         
         if (!subtask.assignee) {

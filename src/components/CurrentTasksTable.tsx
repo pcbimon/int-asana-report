@@ -4,7 +4,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Subtask, Task, Section } from '@/models/asanaReport';
+import { Subtask, Section } from '@/models/asanaReport';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

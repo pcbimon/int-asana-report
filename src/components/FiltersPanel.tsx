@@ -26,7 +26,6 @@ interface FiltersPanelProps {
   onFiltersChange: (filters: FilterOptions) => void;
   availableProjects?: string[];
   availableSections?: string[];
-  availableAssignees?: Array<{ gid: string; name: string }>;
   className?: string;
 }
 
@@ -35,7 +34,6 @@ export function FiltersPanel({
   onFiltersChange,
   availableProjects = [],
   availableSections = [],
-  availableAssignees = [],
   className = '',
 }: FiltersPanelProps) {
   const router = useRouter();
