@@ -19,14 +19,18 @@ Repository layout (recommended)
     - storage.ts
   - /models
     - asanaReport.ts
-  - /pages
-    - /dashboard/[assignee].tsx
-    - /sync.tsx
+  - /app
+    - /protected
+      - /dashboard/[assignee]
+      - /sync
     - /auth
-      - login.tsx
-      - logout.tsx
-      - invite.tsx
-      - forgot-password.tsx
+      - login
+      - logout
+      - confirm
+      - forgot-password
+      - sign-up
+      - sign-up-success
+      - update-password
     - /404.tsx
   - /styles
     - tailwind.css
@@ -115,8 +119,11 @@ Pages & routing
 - /Auth/login — simple login form (use env vars for test user).
 - /Auth/logout — clear session and redirect to login.
 - 404 page for unknown assignees.
-- /auth/invite#access_token=... for create new user to access dashboard. validate token and create user password from `supabase` invite user by email and redirect to login. super admin can invite user from supabase dashboard.
+- /auth/confirm?access_token=... for create new user to access dashboard. validate token and create user password from `supabase` invite user by email and redirect to login. super admin can invite user from supabase dashboard.
 - /auth/forgot-password for reset password form. send reset email from supabase auth.
+- /auth/sign-up for new user registration. only admin can create new user from supabase dashboard.
+- /auth/sign-up-success page after sign-up.
+- /auth/update-password for update password form after reset password email link.
 
 UI & Components
 - Header: assignee name, export buttons.
