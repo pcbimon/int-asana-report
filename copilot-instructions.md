@@ -21,6 +21,13 @@ Repository layout (recommended)
     - asanaReport.ts
   - /pages
     - /dashboard/[assignee].tsx
+    - /sync.tsx
+    - /auth
+      - login.tsx
+      - logout.tsx
+      - invite.tsx
+      - forgot-password.tsx
+    - /404.tsx
   - /styles
     - tailwind.css
 
