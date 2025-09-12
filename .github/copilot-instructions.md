@@ -113,9 +113,9 @@ Storage and sync (/lib/storage.ts)
   - For large datasets consider batch upsert or pagination
 
 Pages & routing
-- /dashboard/[assignee] — server-side render minimal skeleton; fetch from Supabase data on server-side and hydrate charts.
+- protected/dashboard/[assignee] — server-side render minimal skeleton; fetch from Supabase data on server-side and hydrate charts.
 - Authentication: protect route with middleware (JWT/session). On auth success, show only data for authenticated assignee and must create login link from https://supabase.com/docs/guides/auth/server-side/nextjs?queryGroups=router&router=app
-- /sync — trigger data fetch from Asana, process, and save to Supabase. Show last sync time and status.
+- protected/sync — trigger data fetch from Asana, process, and save to Supabase. Show last sync time and status.
 - /Auth/login — simple login form (use env vars for test user).
 - /Auth/logout — clear session and redirect to login.
 - 404 page for unknown assignees.
