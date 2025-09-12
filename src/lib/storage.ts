@@ -176,7 +176,7 @@ export async function saveReport(
     report.getAllAssignees().forEach(assignee => {
       assigneeMap.set(assignee.gid, assignee);
     });
-    
+    console.log(`Collected ${assigneeMap.size} unique assignees.`);
     // Prepare data for upsert
     const assigneeRows: AssigneeRow[] = Array.from(assigneeMap.values()).map(assigneeToRow);
     const sectionRows: SectionRow[] = report.sections.map(sectionToRow);

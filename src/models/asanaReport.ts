@@ -46,7 +46,21 @@ export class AsanaReport {
   constructor(sections: Section[] = []) {
     this.sections = sections;
   }
+  applyAssigneeMap(assigneeMap: Map<string, { gid: string; name: string; email?: string }>) {
+    this.sections.forEach(section => {
+      section.tasks.forEach(task => {
+        if (task.assignee && assigneeMap.has(task.assignee.gid)) {
+          task.assignee = assigneeMap.get(task.assignee.gid);
+        }
 
+        task.subtasks?.forEach(subtask => {
+          if (subtask.assignee && assigneeMap.has(subtask.assignee.gid)) {
+            subtask.assignee = assigneeMap.get(subtask.assignee.gid);
+          }
+        });
+      });
+    });
+  }
   /**
    * Get all unique assignees from tasks and subtasks
    */

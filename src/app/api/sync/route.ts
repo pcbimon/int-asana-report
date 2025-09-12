@@ -38,11 +38,12 @@ export async function POST(request: NextRequest) {
     try {
       // Fetch data from Asana
       console.log('Fetching data from Asana API...');
-      const { sections, totalTasks, totalSubtasks } = await fetchCompleteReport();
+      const { sections, totalTasks, totalSubtasks, assigneeMap } = await fetchCompleteReport();
 
       // Create AsanaReport instance
       const report = new AsanaReport(sections);
-
+      // Apply assignee map to report
+      report.applyAssigneeMap(assigneeMap);
       // Save to Supabase
       console.log('Saving data to Supabase...');
       const result = await saveReport(report, 'asana_sync');

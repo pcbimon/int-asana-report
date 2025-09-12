@@ -127,6 +127,11 @@ interface AsanaSubtask {
   created_at?: string;
   completed_at?: string;
 }
+interface AsanaUserInfo {
+  gid: string;
+  name: string;
+  email: string;
+}
 
 /**
  * Fetch all sections from the project
@@ -192,7 +197,7 @@ export async function fetchSubtasks(taskGid: string): Promise<Subtask[]> {
   try {
     const url = `${BASE_URL}/tasks/${taskGid}/subtasks?opt_fields=name,assignee,completed,created_at,completed_at`;
     const subtasks = await apiRequest<AsanaSubtask[]>(url);
-    
+
     return subtasks.map(subtask => ({
       gid: subtask.gid,
       name: subtask.name,
@@ -211,6 +216,23 @@ export async function fetchSubtasks(taskGid: string): Promise<Subtask[]> {
     throw error;
   }
 }
+/**
+ * Fetch User Info
+ */
+export async function fetchUserInfo(userGid:string): Promise<AsanaUserInfo> {
+  try {
+    const url = `${BASE_URL}/users/${userGid}`;
+    const userInfo = await apiRequest<AsanaUserInfo>(url);
+    return {
+      gid: userInfo.gid,
+      name: userInfo.name,
+      email: userInfo.email,
+    };
+  } catch (error) {
+    console.error('Error fetching user info:', error);
+    throw error;
+  }
+}
 
 /**
  * Fetch complete report data with all sections, tasks, and subtasks
@@ -220,6 +242,7 @@ export async function fetchCompleteReport(): Promise<{
   sections: Section[];
   totalTasks: number;
   totalSubtasks: number;
+  assigneeMap: Map<string, AsanaUserInfo>;
 }> {
   try {
     console.log('Starting complete report fetch...');
@@ -258,7 +281,24 @@ export async function fetchCompleteReport(): Promise<{
     
     const totalTasks = allTasks.length;
     const totalSubtasks = allSubtasksArrays.flat().length;
-    
+    // get all assignees
+    const assigneeGids = new Set<string>();
+    allTasks.forEach(task => {
+      if (task.assignee) {
+        assigneeGids.add(task.assignee.gid);
+      }
+      task.subtasks?.forEach(subtask => {
+        if (subtask.assignee) {
+          assigneeGids.add(subtask.assignee.gid);
+        }
+      });
+    });
+    console.log(`Found ${assigneeGids.size} unique assignees`);
+    // Fetch user info for all assignees in parallel
+    const assigneePromises = Array.from(assigneeGids).map(gid => fetchUserInfo(gid));
+    const assignees = await Promise.all(assigneePromises);
+    const assigneeMap = new Map(assignees.map(user => [user.gid, user]));
+
     const duration = Date.now() - startTime;
     console.log(
       `Complete report fetch finished in ${duration}ms. ` +
@@ -269,6 +309,7 @@ export async function fetchCompleteReport(): Promise<{
       sections,
       totalTasks,
       totalSubtasks,
+      assigneeMap,
     };
   } catch (error) {
     console.error('Error fetching complete report:', error);
