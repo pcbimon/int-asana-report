@@ -72,6 +72,12 @@ Data processing (/lib/dataProcessor.ts)
   - Collect all unique assignees from tasks and subtasks.
   - Provide a list of assignees for filtering in the UI.
   - display assignee email.
+- Weekly Summary Chart
+  - X-axis: weeks (from earliest subtask.created_at to latest subtask.completed_at)
+  - Y-axis: count of tasks
+  - Two lines: assigned (count of subtasks created that week), completed (count of subtasks completed that week)
+  - Overlay a constant line for "Expected completion tasks" from env var NEXT_EXPECTED_COMPLETION_TASKS (e.g. 3 tasks per week)
+  - fill data 52 weeks from last year to current week with 0 for better chart display.
 
 Storage and sync (/lib/storage.ts)
 - This file describes storing data from Asana into Supabase using a "1 Class Model = 1 Table" approach and includes a special table `sync_metadata` to store the `updated_at` of the last sync.
