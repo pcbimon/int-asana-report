@@ -111,7 +111,7 @@ Export & Print
 - Export to Excel: generate CSV/XLSX from current filtered data (SheetJS).
 
 Styling
-- Tailwind CSS for responsive layout and use Shadcn to ui components. Ensure accessible contrast and keyboard nav.
+- Tailwind CSS for responsive layout and use `Shadcn` as Main UI components. Ensure accessible from desktop and mobile.
 
 Testing & quality
 - Unit tests for dataProcessor functions (Jest).
