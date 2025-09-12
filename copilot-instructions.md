@@ -71,6 +71,7 @@ Data processing (/lib/dataProcessor.ts)
 - Assignee list (for admin)
   - Collect all unique assignees from tasks and subtasks.
   - Provide a list of assignees for filtering in the UI.
+  - display assignee email.
 
 Storage and sync (/lib/storage.ts)
 - This file describes storing data from Asana into Supabase using a "1 Class Model = 1 Table" approach and includes a special table `sync_metadata` to store the `updated_at` of the last sync.
