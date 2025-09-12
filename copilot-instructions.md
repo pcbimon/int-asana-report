@@ -144,6 +144,8 @@ Performance considerations
 - Paginate API calls if many tasks.
 - Debounce filter/search operations.
 - Cache computed aggregates to avoid reprocessing on UI-only changes.
+- if no data in supabase, show message to sync data from asana and link to /sync page.
+- sync page should show last sync time and status. and sync process should be server-side only. and can be parallel requests for each section,tasks,subtasks to asana api to speed up.
 
 Security
 - Do not expose PAT in client builds. Prefer server-side proxy or Next.js API routes that read PAT from server env and proxy requests. If PAT is client-side, limit scope and rotate regularly.
