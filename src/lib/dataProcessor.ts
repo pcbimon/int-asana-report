@@ -11,10 +11,10 @@ import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isBetween from 'dayjs/plugin/isBetween';
 import { 
   AsanaReport, 
-  Section, 
-  Task, 
+  Section, // eslint-disable-line @typescript-eslint/no-unused-vars
+  Task, // eslint-disable-line @typescript-eslint/no-unused-vars
   Subtask, 
-  Assignee, 
+  Assignee, // eslint-disable-line @typescript-eslint/no-unused-vars
   AssigneeMetrics, 
   WeeklyData, 
   FilterOptions,
@@ -400,12 +400,12 @@ export function validateReportData(report: AsanaReport): {
   let subtasksWithoutAssignees = 0;
   let subtasksWithoutCreatedDate = 0;
   
-  report.sections.forEach((section, _sectionIndex) => {
+  report.sections.forEach((section, _sectionIndex) => { // eslint-disable-line @typescript-eslint/no-unused-vars
     if (section.tasks.length === 0) {
       warnings.push(`Section "${section.name}" has no tasks`);
     }
     
-    section.tasks.forEach((task, _taskIndex) => {
+    section.tasks.forEach((task, _taskIndex) => { // eslint-disable-line @typescript-eslint/no-unused-vars
       totalTasks++;
       
       if (!task.subtasks || task.subtasks.length === 0) {
@@ -413,7 +413,7 @@ export function validateReportData(report: AsanaReport): {
         return;
       }
       
-      task.subtasks.forEach((subtask, _subtaskIndex) => {
+      task.subtasks.forEach((subtask, _subtaskIndex) => { // eslint-disable-line @typescript-eslint/no-unused-vars
         totalSubtasks++;
         
         if (!subtask.assignee) {

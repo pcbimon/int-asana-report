@@ -1,41 +1,37 @@
 /**
- * Supabase storage layer for Asana Report Dashboard
+ * Supabase storage functions for Asana Report Dashboard
  * Implements "1 Class Model = 1 Table" approach with sync metadata tracking
  * All operations use server-side Supabase client with service role key
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { 
-  AsanaReport, 
-  Section, 
-  Task, 
-  Subtask, 
-  Assignee, 
-  SyncMetadata 
+import {
+  AsanaReport,
+  Section,
+  Task,
+  Subtask,
+  Assignee,
+  SyncMetadata
 } from '@/models/asanaReport';
+import { Database } from '../../database.types';
 
-// Server-side Supabase client (service role)
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase environment variables: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
+function getSupabaseClient() {
+  return createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
  * Database row interfaces matching the schema
  */
 interface AssigneeRow {
   gid: string;
-  name: string;
+  name: string | null;
   email: string | null;
 }
 
 interface SectionRow {
   gid: string;
-  name: string;
+  name: string | null;
 }
 
 interface TaskRow {
@@ -116,6 +112,9 @@ function subtaskToRow(subtask: Subtask): SubtaskRow {
  * Convert database rows to model objects
  */
 function rowToAssignee(row: AssigneeRow): Assignee {
+  if (!row.name) {
+    throw new Error(`Assignee with gid ${row.gid} has null name`);
+  }
   return {
     gid: row.gid,
     name: row.name,
@@ -124,6 +123,9 @@ function rowToAssignee(row: AssigneeRow): Assignee {
 }
 
 function rowToSection(row: SectionRow): Section {
+  if (!row.name) {
+    throw new Error(`Section with gid ${row.gid} has null name`);
+  }
   return {
     gid: row.gid,
     name: row.name,
@@ -202,7 +204,7 @@ export async function saveReport(
     
     // 1. Upsert assignees
     if (assigneeRows.length > 0) {
-      const { error: assigneeError } = await supabase
+      const { error: assigneeError } = await getSupabaseClient()
         .from('assignees')
         .upsert(assigneeRows, { onConflict: 'gid' });
       
@@ -213,7 +215,7 @@ export async function saveReport(
     
     // 2. Upsert sections
     if (sectionRows.length > 0) {
-      const { error: sectionError } = await supabase
+      const { error: sectionError } = await getSupabaseClient()
         .from('sections')
         .upsert(sectionRows, { onConflict: 'gid' });
       
@@ -224,7 +226,7 @@ export async function saveReport(
     
     // 3. Upsert tasks
     if (taskRows.length > 0) {
-      const { error: taskError } = await supabase
+      const { error: taskError } = await getSupabaseClient()
         .from('tasks')
         .upsert(taskRows, { onConflict: 'gid' });
       
@@ -235,7 +237,7 @@ export async function saveReport(
     
     // 4. Upsert subtasks
     if (subtaskRows.length > 0) {
-      const { error: subtaskError } = await supabase
+      const { error: subtaskError } = await getSupabaseClient()
         .from('subtasks')
         .upsert(subtaskRows, { onConflict: 'gid' });
       
@@ -290,10 +292,10 @@ export async function loadReport(): Promise<AsanaReport> {
       { data: taskData, error: taskError },
       { data: subtaskData, error: subtaskError },
     ] = await Promise.all([
-      supabase.from('assignees').select('*'),
-      supabase.from('sections').select('*'),
-      supabase.from('tasks').select('*'),
-      supabase.from('subtasks').select('*'),
+      getSupabaseClient().from('assignees').select('*'),
+      getSupabaseClient().from('sections').select('*'),
+      getSupabaseClient().from('tasks').select('*'),
+      getSupabaseClient().from('subtasks').select('*'),
     ]);
     
     // Check for errors
@@ -367,7 +369,7 @@ export async function loadReport(): Promise<AsanaReport> {
  */
 export async function getLastUpdated(key: string = 'asana_sync'): Promise<SyncMetadata | null> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseClient()
       .from('sync_metadata')
       .select('*')
       .eq('key', key)
@@ -412,9 +414,9 @@ export async function setLastUpdated(
       record_count: recordCount || null,
     };
     
-    const { error } = await supabase
+    const { error } = await getSupabaseClient()
       .from('sync_metadata')
-      .upsert(metadata, { onConflict: 'key' });
+      .upsert(metadata as any, { onConflict: 'key' });
     
     if (error) {
       throw new Error(`Failed to update sync metadata: ${error.message}`);
@@ -431,7 +433,7 @@ export async function setLastUpdated(
  */
 export async function hasData(): Promise<boolean> {
   try {
-    const { count, error } = await supabase
+    const { count, error } = await getSupabaseClient()
       .from('subtasks')
       .select('*', { count: 'exact', head: true });
     
@@ -453,7 +455,7 @@ export async function hasData(): Promise<boolean> {
  */
 export async function getUserRole(uid: string): Promise<string | null> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseClient()
       .from('user_roles')
       .select('role')
       .eq('uid', uid)
@@ -463,7 +465,7 @@ export async function getUserRole(uid: string): Promise<string | null> {
       throw new Error(`Failed to get user role: ${error.message}`);
     }
     
-    return data?.role || null;
+    return (data as any)?.role || null;
     
   } catch (error) {
     console.error('Error getting user role:', error);
@@ -476,7 +478,7 @@ export async function getUserRole(uid: string): Promise<string | null> {
  */
 export async function getUserAssignee(uid: string): Promise<string | null> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseClient()
       .from('user_assignees')
       .select('assignee_gid')
       .eq('uid', uid)
@@ -486,7 +488,7 @@ export async function getUserAssignee(uid: string): Promise<string | null> {
       throw new Error(`Failed to get user assignee: ${error.message}`);
     }
     
-    return data?.assignee_gid || null;
+    return (data as any)?.assignee_gid || null;
     
   } catch (error) {
     console.error('Error getting user assignee:', error);
@@ -499,7 +501,7 @@ export async function getUserAssignee(uid: string): Promise<string | null> {
  */
 export async function getAllAssigneesFromDB(): Promise<Assignee[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseClient()
       .from('assignees')
       .select('*')
       .order('name');
@@ -525,10 +527,10 @@ export async function clearAllData(): Promise<void> {
     
     // Delete in reverse dependency order
     await Promise.all([
-      supabase.from('subtasks').delete().neq('gid', ''),
-      supabase.from('tasks').delete().neq('gid', ''),
-      supabase.from('sections').delete().neq('gid', ''),
-      supabase.from('assignees').delete().neq('gid', ''),
+      getSupabaseClient().from('subtasks').delete().neq('gid', ''),
+      getSupabaseClient().from('tasks').delete().neq('gid', ''),
+      getSupabaseClient().from('sections').delete().neq('gid', ''),
+      getSupabaseClient().from('assignees').delete().neq('gid', ''),
     ]);
     
     console.log('All data cleared from database');

@@ -57,26 +57,6 @@ export function DashboardClient({
     return metrics;
   }, [metrics]); // Removed 'filters' dependency as it's not used in the function
 
-  // Get available assignees from sections
-  const availableAssignees = useMemo(() => {
-    const assignees = new Map<string, { gid: string; name: string }>();
-    
-    sections.forEach(section => {
-      section.tasks.forEach(task => {
-        task.subtasks?.forEach(subtask => {
-          if (subtask.assignee) {
-            assignees.set(subtask.assignee.gid, {
-              gid: subtask.assignee.gid,
-              name: subtask.assignee.name,
-            });
-          }
-        });
-      });
-    });
-    
-    return Array.from(assignees.values());
-  }, [sections]);
-
   // Handle PDF export
   const handleExportPDF = async () => {
     try {
