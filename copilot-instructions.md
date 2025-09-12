@@ -50,6 +50,10 @@ Data processing (/lib/dataProcessor.ts)
   - completed / completed_at / created_at are always taken from the subtask when calculating lead time, overdue, and weekly buckets.
 - Task-level created-week display:
   - Ignore subtask.created_at for the Task-level "created week" display; however, use subtask.created_at, subtask.completed_at, and subtask.assignee for all metric calculations.
+- Table display of tasks:
+  - Show subtasks grouped by their section.
+  - For each subtask, show its created week (from subtask.created_at), assignee (from subtask.assignee), due date (from subtask.due_on), and status (from subtask.completed).
+  - Do not use subtask data to determine the Task's created week or assignee for display purposes.
 - Convert timestamps:
   - Convert all timestamps to ISO (UTC) before computing or grouping by week to reduce timezone issues.
   - If mixed metrics (Task + Subtask) are needed, expose a flag/option to preserve the current behavior.
@@ -88,7 +92,7 @@ Storage and sync (/lib/storage.ts)
   - For large datasets consider batch upsert or pagination
 
 Pages & routing
-- /dashboard/[assignee] — server-side render minimal skeleton; fetch cached data on client and hydrate charts.
+- /dashboard/[assignee] — server-side render minimal skeleton; fetch from Supabase data on server-side and hydrate charts.
 - Authentication: protect route with middleware (JWT/session). On auth success, show only data for authenticated assignee and must create login link from https://supabase.com/docs/guides/auth/server-side/nextjs?queryGroups=router&router=app
 - /sync — trigger data fetch from Asana, process, and save to Supabase. Show last sync time and status.
 - /Auth/login — simple login form (use env vars for test user).
@@ -148,7 +152,9 @@ Note: If you've already added your environment secrets in your deployment/provid
   - use existing user and password from ENV key ADMIN_USER and ADMIN_PWD for authentication and test inside the application.
 
 Performance considerations
-- Paginate API calls if many tasks.
+- All API calls should be optimized for performance.
+- All Data proocessing must be in server side only.
+- Paginate API calls if many subtasks.
 - Debounce filter/search operations.
 - Cache computed aggregates to avoid reprocessing on UI-only changes.
 - if no data in supabase, show message to sync data from asana and link to /sync page.
