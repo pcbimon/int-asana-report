@@ -68,6 +68,9 @@ Data processing (/lib/dataProcessor.ts)
   - weeklyTimeseries.assigned = count subtask.created_at by the week of created_at (or by assigned date if present)
   - weeklyTimeseries.completed = count subtask.completed_at by the week of completed_at
   - avgTime = average (subtask.completed_at - subtask.created_at) per assignee
+- Assignee list (for admin)
+  - Collect all unique assignees from tasks and subtasks.
+  - Provide a list of assignees for filtering in the UI.
 
 Storage and sync (/lib/storage.ts)
 - This file describes storing data from Asana into Supabase using a "1 Class Model = 1 Table" approach and includes a special table `sync_metadata` to store the `updated_at` of the last sync.
