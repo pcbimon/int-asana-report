@@ -66,6 +66,13 @@ Storage and sync (/lib/storage.ts)
   - tasks(gid TEXT PK, name TEXT, section_gid TEXT, assignee_gid TEXT, completed BOOLEAN, completed_at TIMESTAMP, due_on DATE, project TEXT, created_at TIMESTAMP)
   - subtasks(gid TEXT PK, name TEXT, parent_task_gid TEXT, assignee_gid TEXT, completed BOOLEAN, created_at TIMESTAMP, completed_at TIMESTAMP)
   - sync_metadata(key TEXT PK, updated_at TIMESTAMP)
+  - user_roles(uid UUID PK, role TEXT) // for auth roles
+  - user_assignees(uid UUID PK, assignee_gid TEXT) // map user to assignee
+- Roles:
+  - admin: full access to all data and sync and can view all assignees by default
+  - user: read-only access to their own assignee data
+- Use Supabase client with `SUPABASE_SERVICE_ROLE_KEY` for full access (server-side only).
+- Use upsert for save/update operations.
 - Main functions in the file:
   - saveReport(report, metadataKey): save/update assignees, sections, tasks, subtasks (use upsert) and then update `sync_metadata.updated_at`
   - loadReport(): read all tables, join relationships (assignee maps, task -> subtasks, tasks -> sections) and return an AsanaReport
