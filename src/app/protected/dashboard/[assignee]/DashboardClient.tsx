@@ -245,7 +245,7 @@ export function DashboardClient({
                             value={a.gid}
                             onSelect={() => {
                               setAssigneePopoverOpen(false);
-                              router.push(`/protected/dashboard/${a.gid}`);
+                              router.push(`/dashboard/${a.gid}`);
                             }}
                             className="flex items-center gap-2"
                           >
@@ -272,7 +272,7 @@ export function DashboardClient({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.location.href = '/protected/sync'}
+                  onClick={() => window.location.href = '/sync'}
                 >
                   <Settings className="w-4 h-4 mr-1" />
                   Sync Data
