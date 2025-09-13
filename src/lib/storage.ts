@@ -11,7 +11,8 @@ import {
   Task,
   Subtask,
   Assignee,
-  SyncMetadata
+  SyncMetadata,
+  Follower
 } from '@/models/asanaReport';
 import { Database } from '../../database.types';
 
@@ -56,7 +57,10 @@ interface SubtaskRow {
   completed_at: string | null;
   due_on: string | null;
 }
-
+interface FollowerRow {
+  assignee_gid: string;
+  subtask_gid: string;
+}
 interface SyncMetadataRow {
   key: string;
   updated_at: string;
@@ -109,7 +113,12 @@ function subtaskToRow(subtask: Subtask): SubtaskRow {
     due_on: subtask.due_on || null,
   };
 }
-
+function followerToRow(follower: Follower): FollowerRow{
+  return{
+    subtask_gid: follower.subtask_gid,
+    assignee_gid: follower.assignee_gid,
+  };
+}
 /**
  * Convert database rows to model objects
  */
@@ -175,7 +184,7 @@ export async function saveReport(
     
     // Collect all unique assignees
     const assigneeMap = new Map<string, Assignee>();
-    report.getAllAssignees().forEach(assignee => {
+    report.teamMembers.forEach(assignee => {
       assigneeMap.set(assignee.gid, assignee);
     });
     console.log(`Collected ${assigneeMap.size} unique assignees.`);
@@ -184,6 +193,7 @@ export async function saveReport(
     const sectionRows: SectionRow[] = report.sections.map(sectionToRow);
     const taskRows: TaskRow[] = [];
     const subtaskRows: SubtaskRow[] = [];
+    const followerRows: FollowerRow[] = [];
     
     // Flatten tasks and subtasks
     report.sections.forEach(section => {
@@ -192,6 +202,9 @@ export async function saveReport(
         
         task.subtasks?.forEach(subtask => {
           subtaskRows.push(subtaskToRow(subtask));
+          subtask.followers?.forEach(follower => {
+            followerRows.push(followerToRow(follower));
+          });
         });
       });
     });
@@ -245,6 +258,15 @@ export async function saveReport(
       
       if (subtaskError) {
         throw new Error(`Failed to upsert subtasks: ${subtaskError.message}`);
+      }
+    }
+    // 4a. Upsert followers
+    if (followerRows.length > 0) {
+      const { error: followerError } = await getSupabaseClient()
+        .from('followers')
+        .upsert(followerRows, { onConflict: 'subtask_gid,assignee_gid' });
+      if (followerError) {
+        throw new Error(`Failed to upsert followers: ${followerError.message}`);
       }
     }
     

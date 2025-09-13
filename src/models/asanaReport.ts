@@ -19,8 +19,12 @@ export interface Subtask {
   completed_at?: string;
   due_on?: string;
   parent_task_gid?: string;
+  followers?: Follower[];
 }
-
+export interface Follower{
+  subtask_gid: string;
+  assignee_gid: string;
+}
 export interface Task {
   gid: string;
   name: string;
@@ -39,12 +43,18 @@ export interface Section {
   name: string;
   tasks: Task[];
 }
+export interface TeamMember {
+  gid: string;
+  name: string;
+}
 
 export class AsanaReport {
   sections: Section[];
+  teamMembers: TeamMember[];
 
-  constructor(sections: Section[] = []) {
+  constructor(sections: Section[] = [], teamMembers: TeamMember[] = []) {
     this.sections = sections;
+    this.teamMembers = teamMembers;
   }
   applyAssigneeMap(assigneeMap: Map<string, { gid: string; name: string; email?: string }>) {
     this.sections.forEach(section => {
@@ -60,6 +70,9 @@ export class AsanaReport {
         });
       });
     });
+  }
+  setTeamMembers(members: TeamMember[]) {
+    this.teamMembers = members;
   }
   /**
    * Get all unique assignees from tasks and subtasks

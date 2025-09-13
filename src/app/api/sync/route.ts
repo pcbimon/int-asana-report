@@ -44,6 +44,8 @@ export async function POST(request: NextRequest) {
       const report = new AsanaReport(sections);
       // Apply assignee map to report
       report.applyAssigneeMap(assigneeMap);
+      // Set team members
+      report.setTeamMembers(Array.from(assigneeMap.values()));
       // Save to Supabase
       console.log('Saving data to Supabase...');
       const result = await saveReport(report, 'asana_sync');

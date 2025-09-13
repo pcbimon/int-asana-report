@@ -10,6 +10,7 @@ import { Section, Task, Subtask } from '@/models/asanaReport';
 const BASE_URL = process.env.ASANA_BASE_URL || 'https://app.asana.com/api/1.0';
 const TOKEN = process.env.ASANA_TOKEN;
 const PROJECT_ID = process.env.ASANA_PROJECT_ID;
+const TEAM_ID = process.env.ASANA_TEAM_ID;
 
 if (!TOKEN) {
   throw new Error('ASANA_TOKEN environment variable is required');
@@ -127,11 +128,27 @@ interface AsanaSubtask {
   created_at?: string;
   completed_at?: string;
   due_on?: string;
+  followers?: Array<{
+    gid: string;
+    name: string;
+  }>;
 }
 interface AsanaUserInfo {
   gid: string;
   name: string;
   email: string;
+}
+interface AsanaTeamMember {
+  gid: string;
+  team: {
+    gid: string;
+    name: string;
+  };
+  user:{
+    gid: string;
+    name: string;
+  }
+  resource_type: string;
 }
 
 /**
@@ -196,7 +213,7 @@ export async function fetchTasksInSection(sectionGid: string): Promise<Task[]> {
  */
 export async function fetchSubtasks(taskGid: string): Promise<Subtask[]> {
   try {
-    const url = `${BASE_URL}/tasks/${taskGid}/subtasks?opt_fields=name,assignee,completed,created_at,completed_at,due_on`;
+    const url = `${BASE_URL}/tasks/${taskGid}/subtasks?opt_fields=name,assignee,completed,created_at,completed_at,due_on,followers.name`;
     const subtasks = await apiRequest<AsanaSubtask[]>(url);
 
     return subtasks.map(subtask => ({
@@ -212,9 +229,29 @@ export async function fetchSubtasks(taskGid: string): Promise<Subtask[]> {
       completed_at: subtask.completed_at,
       parent_task_gid: taskGid,
       due_on: subtask.due_on,
+      followers: subtask.followers?.map(follower => ({subtask_gid: subtask.gid, assignee_gid: follower.gid})) || [],
     }));
   } catch (error) {
     console.error(`Error fetching subtasks for task ${taskGid}:`, error);
+    throw error;
+  }
+}
+/**
+ * Fetch Team Members of the workspace
+ */
+export async function fetchTeamMembers(): Promise<AsanaTeamMember[]> {
+  try {
+    console.log('Fetching team members for project:', TEAM_ID);
+    if (!TEAM_ID) {
+      throw new Error('ASANA_TEAM_ID environment variable is required to fetch team members');
+    }
+    const url = `${BASE_URL}/team_memberships?team=${TEAM_ID}`;
+    const members = await apiRequest<AsanaTeamMember[]>(url);
+    
+    console.log(`Fetched ${members.length} team members`);
+    return members;
+  } catch (error) {
+    console.error('Error fetching team members:', error);
     throw error;
   }
 }
@@ -283,21 +320,10 @@ export async function fetchCompleteReport(): Promise<{
     
     const totalTasks = allTasks.length;
     const totalSubtasks = allSubtasksArrays.flat().length;
-    // get all assignees
-    const assigneeGids = new Set<string>();
-    allTasks.forEach(task => {
-      if (task.assignee) {
-        assigneeGids.add(task.assignee.gid);
-      }
-      task.subtasks?.forEach(subtask => {
-        if (subtask.assignee) {
-          assigneeGids.add(subtask.assignee.gid);
-        }
-      });
-    });
-    console.log(`Found ${assigneeGids.size} unique assignees`);
+    // get all team members to map user info
+    const teamMembers = await fetchTeamMembers();
     // Fetch user info for all assignees in parallel
-    const assigneePromises = Array.from(assigneeGids).map(gid => fetchUserInfo(gid));
+    const assigneePromises = Array.from(teamMembers).map(member => fetchUserInfo(member.user.gid));
     const assignees = await Promise.all(assigneePromises);
     const assigneeMap = new Map(assignees.map(user => [user.gid, user]));
 
