@@ -343,25 +343,27 @@ export function CurrentTasksTable({
                           </div>
                           {/* Followers on second line of Task column */}
                           <div className="text-sm text-gray-500 mt-1">
-                            {item.followers && item.followers.length > 0 ? (
-                              (() => {
-                                const maxShow = 3;
-                                const ownerGid = item.subtask.assignee?.gid;
-                                // Show up to maxShow follower names (mark owner)
-                                const display = item.followers.slice(0, maxShow).map(f => (
-                                  f.gid === ownerGid ? `${f.name} (Owner)` : f.name
-                                ));
-                                const extra = item.followers.length - display.length;
-                                return (
-                                  <>
-                                    <span>{display.join(', ')}</span>
-                                    {extra > 0 && <span className="ml-2">+{extra}</span>}
-                                  </>
-                                );
-                              })()
-                            ) : (
-                              <span className="text-sm text-gray-400">No followers</span>
-                            )}
+                              {item.followers && item.followers.length > 0 ? (
+                                (() => {
+                                  const maxShow = 3;
+                                  const ownerGid = item.subtask.assignee?.gid;
+                                  // Exclude owner from displayed followers
+                                  const nonOwnerFollowers = item.followers.filter(f => f.gid !== ownerGid);
+                                  const display = nonOwnerFollowers.slice(0, maxShow).map(f => f.name);
+                                  const extra = nonOwnerFollowers.length - display.length;
+                                  if (display.length === 0) {
+                                    return null; // render nothing when there are no non-owner followers
+                                  }
+                                  return (
+                                    <>
+                                      <span>{display.join(', ')}</span>
+                                      {extra > 0 && <span className="ml-2">+{extra}</span>}
+                                    </>
+                                  );
+                                })()
+                              ) : (
+                                <span className="text-sm text-gray-400">No followers</span>
+                              )}
                           </div>
                         </div>
                       </TableCell>
