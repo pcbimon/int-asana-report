@@ -93,13 +93,13 @@ export function WeeklySummaryChart({
                 <span style="display: inline-block; width: 10px; height: 10px; background-color: #10b981; border-radius: 50%; margin-right: 8px;"></span>
                 Completed: ${completed}
               </div>
-                <div style="display: flex; align-items: center; margin-bottom: 2px;">
-                  <span style="display: inline-block; width: 10px; height: 10px; background-color: #ef4444; border-radius: 50%; margin-right: 8px;"></span>
-                  Overdue: ${overdue}
-                </div>
-              <div style="display: flex; align-items: center;">
-                <span style="display: inline-block; width: 10px; height: 10px; background-color: #f59e0b; border-radius: 50%; margin-right: 8px;"></span>
-                Expected: ${expected}
+              <div style="display: flex; align-items: center; margin-bottom: 2px;">
+                <span style="display: inline-block; width: 10px; height: 10px; background-color: #ef4444; border-radius: 50%; margin-right: 8px;"></span>
+                Overdue: ${overdue}
+              </div>
+              <div style="display: flex; align-items: center; margin-bottom: 2px;">
+                <span style="display: inline-block; width: 10px; height: 10px; background-color: #8b5cf6; border-radius: 50%; margin-right: 8px;"></span>
+                Collab: ${collab}
               </div>
             </div>
           `;
