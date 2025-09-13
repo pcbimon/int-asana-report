@@ -239,14 +239,6 @@ export function DashboardClient({
           {/* KPI Cards */}
           <KpiCards metrics={filteredMetrics} />
 
-          {/* Filters Panel */}
-          <FiltersPanel
-            filters={filters}
-            onFiltersChange={setFilters}
-            availableProjects={availableProjects}
-            availableSections={availableSections}
-          />
-
           {/* Weekly Summary Chart */}
           <WeeklySummaryChart
             weeklyData={filteredMetrics.weeklyTimeseries}
