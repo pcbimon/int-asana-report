@@ -70,12 +70,12 @@ export function CurrentTasksTable({
               dayjs(subtask.due_on).isBefore(dayjs(), 'day');
             
             const createdWeek = subtask.created_at 
-              ? dayjs(subtask.created_at).format('YYYY-[W]WW')
+              ? dayjs(subtask.created_at).format('DD MMM YYYY')
               : 'Unknown';
 
             result.push({
               subtask,
-              taskName: task.name,
+              taskName: subtask.name,
               sectionName: section.name,
               createdWeek,
               isOverdue: Boolean(isOverdue),
