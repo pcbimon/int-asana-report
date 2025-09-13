@@ -6,11 +6,12 @@
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/server';
-import { loadReport, hasData, getUserRole, getUserAssignee, getLastUpdated } from '@/lib/storage';
+import { loadReport, hasData, getUserRole, getUserAssignee, getLastUpdated, getAllAssigneesFromDB } from '@/lib/storage';
 import { getAssigneeMetrics } from '@/lib/dataProcessor';
 import { DashboardClient } from './DashboardClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { Assignee } from '@/models/asanaReport';
 
 interface DashboardPageProps {
   params: { assignee: string };
@@ -129,6 +130,17 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
 
     const availableSections = report.sections.map(section => section.name);
 
+    // If admin, fetch the list of all assignees for the dropdown selector
+    let availableAssignees = [] as Assignee[];
+    if (userRole === 'admin') {
+      try {
+        availableAssignees = await getAllAssigneesFromDB();
+      } catch (e) {
+        console.error('Failed to load available assignees:', e);
+        availableAssignees = [];
+      }
+    }
+
     // Get last sync time
     const lastSyncMetadata = await getLastUpdated();
     const lastSyncTime = lastSyncMetadata?.lastUpdated || null;
@@ -145,6 +157,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           userRole={userRole}
           isAdmin={userRole === 'admin'}
           lastSyncTime={lastSyncTime}
+          availableAssignees={availableAssignees}
         />
       </Suspense>
     );

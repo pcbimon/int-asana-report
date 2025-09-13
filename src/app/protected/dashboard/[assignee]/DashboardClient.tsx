@@ -6,6 +6,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Assignee, AssigneeMetrics, Section, FilterOptions, AsanaReport } from '@/models/asanaReport';
 import { generateExportData } from '@/lib/dataProcessor';
 import { Header } from '@/components/Header';
@@ -16,7 +17,15 @@ import { FiltersPanel } from '@/components/FiltersPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Users, Settings } from 'lucide-react';
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandItem,
+  CommandEmpty,
+} from '@/components/ui/command';
+import { RefreshCw, Users, Settings, ChevronsUpDown, Check } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -30,6 +39,7 @@ interface DashboardClientProps {
   userRole: string | null;
   isAdmin: boolean;
   lastSyncTime: string | null;
+  availableAssignees?: Assignee[];
 }
 
 export function DashboardClient({
@@ -41,9 +51,12 @@ export function DashboardClient({
   userRole,
   isAdmin,
   lastSyncTime,
+  availableAssignees = [],
 }: DashboardClientProps) {
   const [filters, setFilters] = useState<FilterOptions>({});
   const [isExporting, setIsExporting] = useState(false);
+  const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
+  const router = useRouter();
 
   // Get expected completion tasks from environment (default: 3)
   const expectedCompletionTasks = parseInt(
@@ -201,6 +214,51 @@ export function DashboardClient({
                 'User'
               )}
             </Badge>
+
+            {/* Admin: assignee selector */}
+            {isAdmin && availableAssignees.length > 0 && (
+              <div className="flex items-center">
+                <label className="sr-only">Select assignee</label>
+                <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
+                  {/* Popover trigger as combobox button */}
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={assigneePopoverOpen}
+                      className="w-[220px] justify-between"
+                      size="sm"
+                    >
+                      {assignee ? `${assignee.email}` : 'Select assignee...'}
+                      <ChevronsUpDown className="opacity-50 ml-2" />
+                    </Button>
+                  </PopoverTrigger>
+
+                  <PopoverContent className="p-0">
+                    <Command>
+                      <CommandInput placeholder="Search assignee..." className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>No assignee found.</CommandEmpty>
+                        {availableAssignees.map((a) => (
+                          <CommandItem
+                            key={a.gid}
+                            value={a.gid}
+                            onSelect={() => {
+                              setAssigneePopoverOpen(false);
+                              router.push(`/protected/dashboard/${a.gid}`);
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <span className="truncate">{a.email}</span>
+                            <Check className={assignee.gid === a.gid ? 'ml-auto opacity-100' : 'ml-auto opacity-0'} />
+                          </CommandItem>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
 
             {lastSyncTime && (
               <div className="flex items-center space-x-2 text-sm text-gray-600">
