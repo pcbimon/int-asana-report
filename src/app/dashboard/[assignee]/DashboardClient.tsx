@@ -194,54 +194,7 @@ export function DashboardClient({
                               ))}
                             </CommandGroup>
                           ))
-                        ) : availableAssignees.some(a => (a as any).departmentId) ? (
-                          // build a department -> assignees map from assignee.departmentId
-                          Object.entries(
-                            availableAssignees.reduce((acc, cur) => {
-                              const dept = (cur as any).departmentId || 'UN';
-                              if (!acc[dept]) acc[dept] = [] as typeof availableAssignees;
-                              acc[dept].push(cur);
-                              return acc;
-                            }, {} as Record<string, Assignee[]>)
-                          ).map(([deptId, assignees]) => ({ deptId, assignees }))
-                          .map(({ deptId, assignees }) => (
-                            <CommandGroup key={deptId} heading={
-                              // try to find human-friendly name from availableDepartments
-                              (availableDepartments.find(d => d.departmentId === deptId) || { name_en: deptId }).name_en
-                            }>
-                              {assignees.map(a => (
-                                <CommandItem
-                                  key={a.gid}
-                                  value={`${a.gid} ${a.email ?? a.name ?? ''}`}
-                                  onSelect={() => {
-                                    setAssigneePopoverOpen(false);
-                                    router.push(`/dashboard/${a.gid}`);
-                                  }}
-                                  className="flex items-center gap-2"
-                                >
-                                  <span className="truncate">{a.email ?? a.name}</span>
-                                  <Check className={assignee.gid === a.gid ? 'ml-auto opacity-100' : 'ml-auto opacity-0'} />
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          ))
-                        ) : (
-                          availableAssignees.map((a) => (
-                            <CommandItem
-                              key={a.gid}
-                              // include email (and name) in the value so cmdk will match on typed email substrings
-                              value={`${a.gid} ${a.email ?? a.name ?? ''}`}
-                              onSelect={() => {
-                                setAssigneePopoverOpen(false);
-                                router.push(`/dashboard/${a.gid}`);
-                              }}
-                              className="flex items-center gap-2"
-                            >
-                              <span className="truncate">{a.email}</span>
-                              <Check className={assignee.gid === a.gid ? 'ml-auto opacity-100' : 'ml-auto opacity-0'} />
-                            </CommandItem>
-                          ))
-                        )}
+                        ) : null}
                       </CommandList>
                     </Command>
                   </PopoverContent>

@@ -75,11 +75,6 @@ interface SyncMetadataRow {
   record_count: number | null;
 }
 
-interface DepartmentRow {
-  departmentid: string;
-  name_en: string;
-  assignees: AssigneeRow[] | null;
-}
 
 /**
  * Convert model objects to database rows
@@ -442,7 +437,7 @@ export async function loadReport(assigneeGid?: string): Promise<AsanaReport> {
           subtasksRaw = subtasksRaw.filter((s) => {
             if (s.assignee_gid === assigneeGid) return true;
             const followers = s.followers || [];
-            return followers.some((f: any) => f && f.assignee_gid === assigneeGid);
+            return followers.some((f) => f && f.assignee_gid === assigneeGid);
           });
         }
 

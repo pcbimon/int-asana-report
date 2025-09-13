@@ -5,6 +5,7 @@ import { getUserAssignee, getLastUpdated } from '@/lib/storage';
 // Maximum allowed age for sync metadata before forcing a resync (ms)
 const SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 1 day
 
+// NOTE: Ensure this file is a Server Component (REMOVE any "use client" at the top).
 export default async function DashboardIndexPage() {
   try {
     const supabase = await createClient();

@@ -46,7 +46,6 @@ export function WeeklySummaryChart({
   const maxAssignedValue = Math.max(...assignedData, 0);
   const maxCompletedValue = Math.max(...completedData, 0);
   const maxOverdueValue = Math.max(...overdueData, 0);
-  const maxCollabValue = Math.max(...collabData, 0);
   const maxExpectedValue = Math.max(...expectedData, 0);
   const rawMax = Math.max(maxAssignedValue, maxCompletedValue, maxOverdueValue, maxExpectedValue);
   // Round up to nearest integer; ensure at least 1 so axis shows something when rawMax is 0
@@ -78,7 +77,6 @@ export function WeeklySummaryChart({
           const week = weekData.axisValue;
           const assigned = params.find((p: any) => p.seriesName === 'Assigned')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
           const completed = params.find((p: any) => p.seriesName === 'Completed')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
-          const expected = params.find((p: any) => p.seriesName === 'Expected')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
           const overdue = params.find((p: any) => p.seriesName === 'Overdue')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
           const collab = params.find((p: any) => p.seriesName === 'Collab')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
           

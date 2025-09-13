@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { SyncMetadata } from '@/models/asanaReport';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,9 +46,43 @@ export function SyncClient({ lastSync, userEmail }: SyncClientProps) {
   const [error, setError] = useState<string | null>(null);
   const autoTriggeredRef = useRef(false);
 
-  // ms threshold for auto-sync: 1 day
-  const SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+// ms threshold for auto-sync: 1 day
+const SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const router = useRouter();
+  
+  const handleSync = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setSyncProgress([]);
+
+      const response = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Sync failed');
+      }
+
+      const result = await response.json();
+      setCurrentSync(result.metadata);
+
+      if (result.success) setIsLoading(false);
+      else {
+        setError(result.message || 'Sync failed');
+        setIsLoading(false);
+      }
+
+    } catch (err) {
+      console.error('Error starting sync:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      setIsLoading(false);
+    }
+  }, [userEmail]);
+
   // When an auto-triggered sync completes successfully, navigate to the dashboard
   useEffect(() => {
     try {
@@ -70,6 +104,7 @@ export function SyncClient({ lastSync, userEmail }: SyncClientProps) {
           // Don't trigger if the last sync is already marked in-progress
           if (currentSync.status !== 'in-progress') {
             autoTriggeredRef.current = true;
+            // handleSync is stable (see useCallback below)
             handleSync();
           }
         }
@@ -103,40 +138,7 @@ export function SyncClient({ lastSync, userEmail }: SyncClientProps) {
     return () => {
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [isLoading]);
-
-  const handleSync = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setSyncProgress([]);
-
-      const response = await fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userEmail }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Sync failed');
-      }
-
-      const result = await response.json();
-      setCurrentSync(result.metadata);
-
-      if (result.success) setIsLoading(false);
-      else {
-        setError(result.message || 'Sync failed');
-        setIsLoading(false);
-      }
-
-    } catch (err) {
-      console.error('Error starting sync:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
-      setIsLoading(false);
-    }
-  };
+  }, [isLoading, currentSync, handleSync, SYNC_MAX_AGE_MS]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
