@@ -56,6 +56,7 @@ export type Database = {
           gid: string
           name: string | null
           parent_task_gid: string | null
+          due_on: string | null
         }
         Insert: {
           assignee_gid?: string | null
@@ -65,6 +66,7 @@ export type Database = {
           gid: string
           name?: string | null
           parent_task_gid?: string | null
+          due_on?: string | null
         }
         Update: {
           assignee_gid?: string | null
@@ -74,6 +76,7 @@ export type Database = {
           gid?: string
           name?: string | null
           parent_task_gid?: string | null
+          due_on?: string | null
         }
         Relationships: [
           {

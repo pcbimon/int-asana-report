@@ -54,6 +54,7 @@ interface SubtaskRow {
   completed: boolean;
   created_at: string | null;
   completed_at: string | null;
+  due_on: string | null;
 }
 
 interface SyncMetadataRow {
@@ -105,6 +106,7 @@ function subtaskToRow(subtask: Subtask): SubtaskRow {
     completed: subtask.completed,
     created_at: subtask.created_at || null,
     completed_at: subtask.completed_at || null,
+    due_on: subtask.due_on || null,
   };
 }
 

@@ -126,6 +126,7 @@ interface AsanaSubtask {
   completed: boolean;
   created_at?: string;
   completed_at?: string;
+  due_on?: string;
 }
 interface AsanaUserInfo {
   gid: string;
@@ -195,7 +196,7 @@ export async function fetchTasksInSection(sectionGid: string): Promise<Task[]> {
  */
 export async function fetchSubtasks(taskGid: string): Promise<Subtask[]> {
   try {
-    const url = `${BASE_URL}/tasks/${taskGid}/subtasks?opt_fields=name,assignee,completed,created_at,completed_at`;
+    const url = `${BASE_URL}/tasks/${taskGid}/subtasks?opt_fields=name,assignee,completed,created_at,completed_at,due_on`;
     const subtasks = await apiRequest<AsanaSubtask[]>(url);
 
     return subtasks.map(subtask => ({
@@ -210,6 +211,7 @@ export async function fetchSubtasks(taskGid: string): Promise<Subtask[]> {
       created_at: subtask.created_at,
       completed_at: subtask.completed_at,
       parent_task_gid: taskGid,
+      due_on: subtask.due_on,
     }));
   } catch (error) {
     console.error(`Error fetching subtasks for task ${taskGid}:`, error);
