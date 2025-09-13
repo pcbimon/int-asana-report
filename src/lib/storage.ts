@@ -216,7 +216,13 @@ export async function saveReport(
     );
 
     // Execute upserts in sequence (could be parallelized for better performance)
-
+    // First Clear existing data to avoid conflicts
+    await getSupabaseClient().from('followers').delete().neq('subtask_gid', '');
+    await getSupabaseClient().from('subtasks').delete().neq('gid', '');
+    await getSupabaseClient().from('tasks').delete().neq('gid', '');
+    await getSupabaseClient().from('sections').delete().neq('gid', '');
+    await getSupabaseClient().from('assignees').delete().neq('gid', '');
+    console.log('Cleared existing data from tables.');
     // 1. Upsert assignees
     if (assigneeRows.length > 0) {
       const { error: assigneeError } = await getSupabaseClient()
