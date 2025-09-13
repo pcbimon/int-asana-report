@@ -5,6 +5,7 @@
 
 import { Assignee } from '@/models/asanaReport';
 import { ExportButtons } from '@/components/ExportButtons';
+import { LogoutButton } from '@/components/logout-button';
 
 interface HeaderProps {
   assignee: Assignee;
@@ -38,6 +39,7 @@ export function Header({ assignee, onExportPDF, onExportExcel }: HeaderProps) {
               onExportPDF={onExportPDF}
               onExportExcel={onExportExcel}
             />
+            <LogoutButton />
           </div>
         </div>
       </div>
