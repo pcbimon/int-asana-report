@@ -92,6 +92,13 @@ export class AsanaReport {
           if (subtask.assignee) {
             assigneeMap.set(subtask.assignee.gid, subtask.assignee);
           }
+
+          // Also collect followers as potential users (so follower-only users are discoverable)
+          subtask.followers?.forEach(f => {
+            if (f) {
+              assigneeMap.set(f.gid, f);
+            }
+          });
         });
       });
     });
@@ -163,6 +170,7 @@ export interface WeeklyData {
   assigned: number;       // Count of subtasks created this week
   completed: number;      // Count of subtasks completed this week
   overdue: number;        // Count of subtasks that became overdue this week
+  collab?: number;        // Count of subtasks where user is follower (collaboration)
 }
 
 /**

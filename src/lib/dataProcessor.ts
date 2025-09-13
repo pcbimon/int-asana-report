@@ -81,28 +81,29 @@ function calculateLeadTime(createdAt?: string, completedAt?: string): number | n
  */
 function generateWeeklyTimeseries(
   subtasks: Subtask[],
+  collabSubtasks?: Subtask[],
   startWeek?: string,
   endWeek?: string
 ): WeeklyData[] {
   // Map keys are ISO week strings in format YYYY-Www (e.g. 2025-W37)
-  const weeklyMap = new Map<string, { assigned: number; completed: number; overdue: number }>();
+  const weeklyMap = new Map<string, { assigned: number; completed: number; overdue: number; collab: number }>();
   // Process subtasks for assigned and completed counts
   subtasks.forEach(subtask => {
     // Count assigned (created) subtasks
     if (subtask.created_at) {
       const isoWeekKey = getISOWeek(subtask.created_at);
-      if (!weeklyMap.has(isoWeekKey)) {
-        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0, overdue: 0 });
-      }
+         if (!weeklyMap.has(isoWeekKey)) {
+           weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0, overdue: 0, collab: 0 });
+         }
       weeklyMap.get(isoWeekKey)!.assigned++;
     }
 
     // Count completed subtasks
     if (subtask.completed_at) {
       const isoWeekKey = getISOWeek(subtask.completed_at);
-      if (!weeklyMap.has(isoWeekKey)) {
-        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0, overdue: 0 });
-      }
+         if (!weeklyMap.has(isoWeekKey)) {
+           weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0, overdue: 0, collab: 0 });
+         }
       weeklyMap.get(isoWeekKey)!.completed++;
     }
 
@@ -110,9 +111,20 @@ function generateWeeklyTimeseries(
     if (subtask.due_on && !subtask.completed && isSubtaskOverdue(subtask)) {
       const isoWeekKey = getISOWeek(subtask.due_on);
       if (!weeklyMap.has(isoWeekKey)) {
-        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0, overdue: 0 });
+        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0, overdue: 0, collab: 0 });
       }
       weeklyMap.get(isoWeekKey)!.overdue++;
+    }
+  });
+
+  // Process collab (follower) subtasks - count them by created_at week
+  (collabSubtasks || []).forEach(subtask => {
+    if (subtask.created_at) {
+      const isoWeekKey = getISOWeek(subtask.created_at);
+      if (!weeklyMap.has(isoWeekKey)) {
+        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0, overdue: 0, collab: 0 });
+      }
+      weeklyMap.get(isoWeekKey)!.collab++;
     }
   });
   // Determine date range - default to 52 weeks from last year to current week
@@ -133,16 +145,17 @@ function generateWeeklyTimeseries(
 
   while (current.isSameOrBefore(endDate)) {
     const isoWeekKey = getISOWeek(current.toISOString());
-  const weekData = weeklyMap.get(isoWeekKey) || { assigned: 0, completed: 0, overdue: 0 };
+    const weekData = weeklyMap.get(isoWeekKey) || { assigned: 0, completed: 0, overdue: 0, collab: 0 };
 
     result.push({
       // week should be YYYY-Www
       week: isoWeekKey,
       // weekStart should be the ISO timestamp of the start of the week (Monday)
       weekStart: current.toISOString(),
-  assigned: weekData.assigned,
-  completed: weekData.completed,
-  overdue: weekData.overdue,
+      assigned: weekData.assigned,
+      completed: weekData.completed,
+      overdue: weekData.overdue,
+      collab: weekData.collab,
     });
 
     current = current.add(1, 'week');
@@ -176,9 +189,10 @@ export function processAsanaReport(report: AsanaReport): AssigneeMetrics[] {
     });
   });
   
-  // Collect all subtasks by assignee
+  // Collect all subtasks by assignee (assigned) and by follower (collab)
   const subtasksByAssignee = new Map<string, Subtask[]>();
-  
+  const collabSubtasksByAssignee = new Map<string, Subtask[]>();
+
   report.sections.forEach(section => {
     section.tasks.forEach(task => {
       // Normalize timestamps for all subtasks
@@ -186,16 +200,27 @@ export function processAsanaReport(report: AsanaReport): AssigneeMetrics[] {
         subtask.created_at = normalizeTimestamp(subtask.created_at) || undefined;
         subtask.completed_at = normalizeTimestamp(subtask.completed_at) || undefined;
         subtask.due_on = normalizeTimestamp(subtask.due_on) || undefined;
-        
-        // Only process subtasks with assignees
+
+        // Assigned subtasks map (only if subtask has an assignee)
         if (subtask.assignee) {
           const assigneeGid = subtask.assignee.gid;
-          
           if (!subtasksByAssignee.has(assigneeGid)) {
             subtasksByAssignee.set(assigneeGid, []);
           }
           subtasksByAssignee.get(assigneeGid)!.push(subtask);
         }
+
+        // For followers, add this subtask to each follower's collab map
+        // but skip if follower is the same as the subtask assignee (avoid double-counting)
+        (subtask.followers || []).forEach(follower => {
+          if (!follower) return;
+          if (subtask.assignee && follower.gid === subtask.assignee.gid) return; // skip owner
+          const followerGid = follower.gid;
+          if (!collabSubtasksByAssignee.has(followerGid)) {
+            collabSubtasksByAssignee.set(followerGid, []);
+          }
+          collabSubtasksByAssignee.get(followerGid)!.push(subtask);
+        });
       });
     });
   });
@@ -204,15 +229,15 @@ export function processAsanaReport(report: AsanaReport): AssigneeMetrics[] {
   subtasksByAssignee.forEach((subtasks, assigneeGid) => {
     const metrics = assigneeMetricsMap.get(assigneeGid);
     if (!metrics) return;
-    
-    // Basic counts
+
+    // Basic counts (based on assigned subtasks only)
     metrics.total = subtasks.length;
     metrics.completed = subtasks.filter(s => s.completed).length;
     metrics.overdue = subtasks.filter(s => isSubtaskOverdue(s)).length;
-    
+
     // Completion rate
     metrics.completionRate = metrics.total > 0 ? metrics.completed / metrics.total : 0;
-    
+
     // Average lead time (only for completed subtasks)
     const completedSubtasks = subtasks.filter(s => s.completed && s.created_at && s.completed_at);
     if (completedSubtasks.length > 0) {
@@ -220,12 +245,28 @@ export function processAsanaReport(report: AsanaReport): AssigneeMetrics[] {
         const leadTime = calculateLeadTime(subtask.created_at, subtask.completed_at);
         return sum + (leadTime || 0);
       }, 0);
-      
+
       metrics.avgTime = totalLeadTime / completedSubtasks.length;
     }
-    
-    // Weekly timeseries
-    metrics.weeklyTimeseries = generateWeeklyTimeseries(subtasks);
+
+    // Weekly timeseries: pass both assigned subtasks and collab subtasks for this user
+    const collabSubtasks = collabSubtasksByAssignee.get(assigneeGid) || [];
+    metrics.weeklyTimeseries = generateWeeklyTimeseries(subtasks, collabSubtasks);
+  });
+
+  // Also populate metrics for users who are only followers (no assigned subtasks)
+  collabSubtasksByAssignee.forEach((collabs, userGid) => {
+    if (subtasksByAssignee.has(userGid)) return; // already processed as assignee
+    const metrics = assigneeMetricsMap.get(userGid);
+    if (!metrics) return;
+
+    // totals remain zero for assigned, but we still want weekly collab series
+    metrics.total = 0;
+    metrics.completed = 0;
+    metrics.overdue = 0;
+    metrics.completionRate = 0;
+    metrics.avgTime = 0;
+    metrics.weeklyTimeseries = generateWeeklyTimeseries([], collabs);
   });
   
   // Remove assignees with no subtasks

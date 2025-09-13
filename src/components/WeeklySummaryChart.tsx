@@ -39,12 +39,14 @@ export function WeeklySummaryChart({
   const assignedData = weeklyData.map(d => d.assigned);
   const completedData = weeklyData.map(d => d.completed);
   const overdueData = weeklyData.map(d => d.overdue || 0);
+  const collabData = weeklyData.map(d => d.collab || 0);
   const expectedData = weeklyData.map(() => expectedCompletionTasks);
 
   // Determine y-axis bounds: ensure integer ticks and step of 1
   const maxAssignedValue = Math.max(...assignedData, 0);
   const maxCompletedValue = Math.max(...completedData, 0);
   const maxOverdueValue = Math.max(...overdueData, 0);
+  const maxCollabValue = Math.max(...collabData, 0);
   const maxExpectedValue = Math.max(...expectedData, 0);
   const rawMax = Math.max(maxAssignedValue, maxCompletedValue, maxOverdueValue, maxExpectedValue);
   // Round up to nearest integer; ensure at least 1 so axis shows something when rawMax is 0
@@ -78,6 +80,7 @@ export function WeeklySummaryChart({
           const completed = params.find((p: any) => p.seriesName === 'Completed')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
           const expected = params.find((p: any) => p.seriesName === 'Expected')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
           const overdue = params.find((p: any) => p.seriesName === 'Overdue')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
+          const collab = params.find((p: any) => p.seriesName === 'Collab')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
           
           return `
             <div style="padding: 8px;">
@@ -103,7 +106,7 @@ export function WeeklySummaryChart({
         },
       },
       legend: {
-        data: ['Assigned', 'Completed', 'Overdue', 'Expected'],
+        data: ['Assigned', 'Completed', 'Overdue', 'Collab', 'Expected'],
         bottom: 10,
         textStyle: {
           color: '#374151',
@@ -221,6 +224,23 @@ export function WeeklySummaryChart({
           symbolSize: 6,
           smooth: true,
           z: 2,
+        },
+        {
+          name: 'Collab',
+          type: 'line',
+          data: collabData,
+          itemStyle: {
+            color: '#8b5cf6',
+          },
+          lineStyle: {
+            color: '#8b5cf6',
+            width: 2,
+            type: 'dashed',
+          },
+          symbol: 'circle',
+          symbolSize: 6,
+          smooth: true,
+          z: 1,
         },
         {
           name: 'Expected',
