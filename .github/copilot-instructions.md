@@ -93,14 +93,14 @@ Supabase library
 Storage and sync (/lib/storage.ts)
 - This file describes storing data from Asana into Supabase using a "1 Class Model = 1 Table" approach and includes a special table `sync_metadata` to store the `updated_at` of the last sync.
 - Recommended schema:
-  - assignees(gid TEXT PK, name TEXT, email TEXT)
-  - sections(gid TEXT PK, name TEXT)
-  - tasks(gid TEXT PK, name TEXT, section_gid TEXT, assignee_gid TEXT, completed BOOLEAN, completed_at TIMESTAMP, due_on DATE, project TEXT, created_at TIMESTAMP)
-  - subtasks(gid TEXT PK, name TEXT, parent_task_gid TEXT, assignee_gid TEXT, completed BOOLEAN, created_at TIMESTAMP, completed_at TIMESTAMP)
-  - sync_metadata(key TEXT PK, updated_at TIMESTAMP)
-  - user_roles(uid UUID PK, role TEXT) // for auth roles
-  - user_assignees(uid UUID PK, assignee_gid TEXT) // map user to assignee
-  - followers(subtask_gid TEXT PK, assignee_gid UUID PK) // map subtask to followers
+  - assignees (gid TEXT PRIMARY KEY, name TEXT, email TEXT)
+  - sections (gid TEXT PRIMARY KEY, name TEXT)
+  - tasks (gid TEXT PRIMARY KEY, name TEXT, section_gid TEXT, assignee_gid TEXT, completed BOOLEAN, completed_at TIMESTAMPTZ, created_at TIMESTAMPTZ, due_on DATE, project TEXT)
+  - subtasks (gid TEXT PRIMARY KEY, name TEXT, parent_task_gid TEXT, assignee_gid TEXT, completed BOOLEAN, created_at TIMESTAMPTZ, completed_at TIMESTAMPTZ, due_on DATE)
+  - followers (subtask_gid TEXT NOT NULL REFERENCES subtasks(gid) ON DELETE CASCADE, assignee_gid TEXT NOT NULL REFERENCES assignees(gid) ON DELETE CASCADE, PRIMARY KEY (subtask_gid, assignee_gid))
+  - sync_metadata (key TEXT PRIMARY KEY, message TEXT, record_count INTEGER, status TEXT, updated_at TIMESTAMPTZ)
+  - user_roles (uid TEXT PRIMARY KEY, role TEXT) -- consider UUID if using Supabase auth users
+  - user_assignees (uid TEXT PRIMARY KEY, assignee_gid TEXT REFERENCES assignees(gid) ON DELETE SET NULL)
 - Roles:
   - admin: full access to all data and sync and can view all assignees by default
   - user: read-only access to their own assignee data
