@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import * as echarts from 'echarts';
 import { WeeklyData } from '@/models/asanaReport';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import dayjs from 'dayjs';
 
 interface WeeklySummaryChartProps {
   weeklyData: WeeklyData[];
@@ -23,7 +24,6 @@ export function WeeklySummaryChart({
 }: WeeklySummaryChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
-
   useEffect(() => {
     if (!chartRef.current || weeklyData.length === 0) return;
 
@@ -35,7 +35,7 @@ export function WeeklySummaryChart({
     const chart = chartInstance.current;
 
     // Prepare data
-    const weeks = weeklyData.map(d => d.week);
+    const weeks = weeklyData.map(d => dayjs(d.weekStart).format('DD MMM YYYY'));
     const assignedData = weeklyData.map(d => d.assigned);
     const completedData = weeklyData.map(d => d.completed);
     const expectedData = weeklyData.map(() => expectedCompletionTasks);
