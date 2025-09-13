@@ -86,67 +86,15 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
       );
     }
 
-    const report = await loadReport(assigneeGid);
-
-    const allAssignees = report.getAllAssignees();
-    const assignee = allAssignees.find(a => a.gid === assigneeGid);
-    if (!assignee) {
-      notFound();
-    }
-
-    const metrics = getAssigneeMetrics(report, assigneeGid);
-    if (!metrics) {
-      return (
-        <div className="min-h-screen bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <Card>
-              <CardContent className="p-8 text-center">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                  No Tasks Found
-                </h2>
-                <p className="text-gray-600">
-                  No tasks found for {assignee.name}. They may not have any assigned subtasks in the current data.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      );
-    }
-
-    const availableProjects = Array.from(new Set(
-      report.sections.flatMap(section =>
-        section.tasks.map(task => task.project).filter(Boolean)
-      )
-    )) as string[];
-
-    const availableSections = report.sections.map(section => section.name);
-
-    let availableAssignees = [] as Assignee[];
-    if (userRole === 'admin') {
-      try {
-        availableAssignees = await getAllAssigneesFromDB();
-      } catch (e) {
-        console.error('Failed to load available assignees:', e);
-        availableAssignees = [];
-      }
-    }
-
-    const lastSyncMetadata = await getLastUpdated();
-    const lastSyncTime = lastSyncMetadata?.lastUpdated || null;
-
+    // Render a Suspense wrapper and delegate data fetching to an async child
+    // component `DashboardContent`. This lets Next.js show the `DashboardSkeleton`
+    // while the heavier `loadReport` operation runs on the server.
     return (
       <Suspense fallback={<DashboardSkeleton />}>
-        <DashboardClient
-          assignee={assignee}
-          metrics={metrics}
-          sections={report.sections}
-          availableProjects={availableProjects}
-          availableSections={availableSections}
+        {/* DashboardContent is an async server component defined below */}
+        <DashboardContent
+          assigneeGid={assigneeGid}
           userRole={userRole}
-          isAdmin={userRole === 'admin'}
-          lastSyncTime={lastSyncTime}
-          availableAssignees={availableAssignees}
         />
       </Suspense>
     );
@@ -197,4 +145,74 @@ export async function generateMetadata({ params }: DashboardPageProps) {
       description: 'Individual dashboard showing task metrics and progress.',
     };
   }
+}
+
+// Async server component that actually loads report data and renders the
+// `DashboardClient`. Keeping this as a separate async component lets the
+// parent `DashboardPage` render a Suspense fallback while `loadReport` runs.
+async function DashboardContent({ assigneeGid, userRole }: { assigneeGid: string; userRole: string | null }) {
+  // Load the report for the assignee
+  const report = await loadReport(assigneeGid);
+
+  const allAssignees = report.getAllAssignees();
+  const assignee = allAssignees.find(a => a.gid === assigneeGid);
+  if (!assignee) {
+    notFound();
+  }
+
+  const metrics = getAssigneeMetrics(report, assigneeGid);
+  if (!metrics) {
+    // Render a lightweight message if there are no tasks
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Card>
+            <CardContent className="p-8 text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                No Tasks Found
+              </h2>
+              <p className="text-gray-600">
+                No tasks found for {assignee.name}. They may not have any assigned subtasks in the current data.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const availableProjects = Array.from(new Set(
+    report.sections.flatMap(section =>
+      section.tasks.map(task => task.project).filter(Boolean)
+    )
+  )) as string[];
+
+  const availableSections = report.sections.map(section => section.name);
+
+  let availableAssignees = [] as Assignee[];
+  if (userRole === 'admin') {
+    try {
+      availableAssignees = await getAllAssigneesFromDB();
+    } catch (e) {
+      console.error('Failed to load available assignees:', e);
+      availableAssignees = [];
+    }
+  }
+
+  const lastSyncMetadata = await getLastUpdated();
+  const lastSyncTime = lastSyncMetadata?.lastUpdated || null;
+
+  return (
+    <DashboardClient
+      assignee={assignee}
+      metrics={metrics}
+      sections={report.sections}
+      availableProjects={availableProjects}
+      availableSections={availableSections}
+      userRole={userRole}
+      isAdmin={userRole === 'admin'}
+      lastSyncTime={lastSyncTime}
+      availableAssignees={availableAssignees}
+    />
+  );
 }
