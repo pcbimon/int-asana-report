@@ -328,9 +328,6 @@ export function CurrentTasksTable({
                           <div className="font-medium text-gray-900">
                             {item.taskName}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {item.subtask.name}
-                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -340,16 +337,6 @@ export function CurrentTasksTable({
                         <div className="text-sm">
                           {formatDate(item.subtask.created_at)}
                         </div>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <div className="text-xs text-gray-500">
-                              {item.createdWeek}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Start Week Date: {formatDate(item.createdWeek)}</p>
-                          </TooltipContent>
-                        </Tooltip>
                         
                       </TableCell>
                       <TableCell>
