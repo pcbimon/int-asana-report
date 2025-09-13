@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      assignee_department: {
+        Row: {
+          assignee_gid: string
+          departmentid: string
+        }
+        Insert: {
+          assignee_gid: string
+          departmentid: string
+        }
+        Update: {
+          assignee_gid?: string
+          departmentid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignee_department_assignee_gid_fkey"
+            columns: ["assignee_gid"]
+            isOneToOne: true
+            referencedRelation: "assignees"
+            referencedColumns: ["gid"]
+          },
+          {
+            foreignKeyName: "assignee_department_departmentid_fkey"
+            columns: ["departmentid"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["departmentid"]
+          },
+        ]
+      }
       assignees: {
         Row: {
           email: string | null
@@ -29,6 +59,21 @@ export type Database = {
           email?: string | null
           gid?: string
           name?: string | null
+        }
+        Relationships: []
+      }
+      departments: {
+        Row: {
+          departmentid: string
+          name_en: string
+        }
+        Insert: {
+          departmentid: string
+          name_en: string
+        }
+        Update: {
+          departmentid?: string
+          name_en?: string
         }
         Relationships: []
       }
@@ -243,32 +288,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_user_departments: {
-        Args: { user_email?: string }
-        Returns: {
-          department_code: string
-          department_id: number
-          department_name: string
-          role_level: number
-          role_name: string
-        }[]
-      }
-      get_user_role: {
-        Args: { dept_id?: number; user_email?: string }
-        Returns: {
-          can_view_emails: string[]
-          department_code: string
-          department_id: number
-          department_name: string
-          is_active: boolean
-          role_level: number
-          role_name: string
-        }[]
-      }
-      is_email_authorized: {
-        Args: { user_email: string }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

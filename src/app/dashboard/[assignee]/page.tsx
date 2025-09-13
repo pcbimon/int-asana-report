@@ -6,7 +6,7 @@
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/server';
-import { loadReport, hasData, getUserRole, getUserAssignee, getLastUpdated, getAllAssigneesFromDB } from '@/lib/storage';
+import { loadReport, hasData, getUserRole, getUserAssignee, getLastUpdated, getAllAssigneesFromDB, getDepartmentsWithAssignees } from '@/lib/storage';
 import { getAssigneeMetrics } from '@/lib/dataProcessor';
 import { DashboardClient } from './DashboardClient';
 import { Card, CardContent } from '@/components/ui/card';
@@ -202,6 +202,17 @@ async function DashboardContent({ assigneeGid, userRole }: { assigneeGid: string
   const lastSyncMetadata = await getLastUpdated();
   const lastSyncTime = lastSyncMetadata?.lastUpdated || null;
 
+  // Load departments grouped assignees (for admin UI grouping)
+  let availableDepartments = [] as { departmentId: string; name_en: string; assignee: Assignee[] }[];
+  if (userRole === 'admin') {
+    try {
+      availableDepartments = await getDepartmentsWithAssignees();
+    } catch (e) {
+      console.error('Failed to load departments with assignees:', e);
+      availableDepartments = [];
+    }
+  }
+
   return (
     <DashboardClient
       assignee={assignee}
@@ -213,6 +224,7 @@ async function DashboardContent({ assigneeGid, userRole }: { assigneeGid: string
       isAdmin={userRole === 'admin'}
       lastSyncTime={lastSyncTime}
       availableAssignees={availableAssignees}
+      availableDepartments={availableDepartments}
     />
   );
 }

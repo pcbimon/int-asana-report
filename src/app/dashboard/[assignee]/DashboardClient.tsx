@@ -21,6 +21,7 @@ import {
   CommandList,
   CommandItem,
   CommandEmpty,
+  CommandGroup,
 } from '@/components/ui/command';
 import { RefreshCw, Users, Settings, ChevronsUpDown, Check } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -38,6 +39,7 @@ interface DashboardClientProps {
   isAdmin: boolean;
   lastSyncTime: string | null;
   availableAssignees?: Assignee[];
+  availableDepartments?: { departmentId: string; name_en: string; assignee: Assignee[] }[];
 }
 
 export function DashboardClient({
@@ -48,6 +50,7 @@ export function DashboardClient({
   isAdmin,
   lastSyncTime,
   availableAssignees = [],
+  availableDepartments = [],
 }: DashboardClientProps) {
   const [filters] = useState<FilterOptions>({});
   const [isExporting, setIsExporting] = useState(false);
@@ -171,21 +174,74 @@ export function DashboardClient({
                       <CommandInput placeholder="Search assignee..." className="h-9" />
                       <CommandList>
                         <CommandEmpty>No assignee found.</CommandEmpty>
-                        {availableAssignees.map((a) => (
-                          <CommandItem
-                            key={a.gid}
-                            // include email (and name) in the value so cmdk will match on typed email substrings
-                            value={`${a.gid} ${a.email ?? a.name ?? ''}`}
-                            onSelect={() => {
-                              setAssigneePopoverOpen(false);
-                              router.push(`/dashboard/${a.gid}`);
-                            }}
-                            className="flex items-center gap-2"
-                          >
-                            <span className="truncate">{a.email}</span>
-                            <Check className={assignee.gid === a.gid ? 'ml-auto opacity-100' : 'ml-auto opacity-0'} />
-                          </CommandItem>
-                        ))}
+                        {/* Prefer grouping from availableDepartments if provided */}
+                        {availableDepartments && availableDepartments.length > 0 ? (
+                          availableDepartments.map((dept) => (
+                            <CommandGroup key={dept.departmentId} heading={dept.name_en}>
+                              {(dept.assignee || []).map(a => (
+                                <CommandItem
+                                  key={a.gid}
+                                  value={`${a.gid} ${a.email ?? a.name ?? ''}`}
+                                  onSelect={() => {
+                                    setAssigneePopoverOpen(false);
+                                    router.push(`/dashboard/${a.gid}`);
+                                  }}
+                                  className="flex items-center gap-2"
+                                >
+                                  <span className="truncate">{a.email ?? a.name}</span>
+                                  <Check className={assignee.gid === a.gid ? 'ml-auto opacity-100' : 'ml-auto opacity-0'} />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          ))
+                        ) : availableAssignees.some(a => (a as any).departmentId) ? (
+                          // build a department -> assignees map from assignee.departmentId
+                          Object.entries(
+                            availableAssignees.reduce((acc, cur) => {
+                              const dept = (cur as any).departmentId || 'UN';
+                              if (!acc[dept]) acc[dept] = [] as typeof availableAssignees;
+                              acc[dept].push(cur);
+                              return acc;
+                            }, {} as Record<string, Assignee[]>)
+                          ).map(([deptId, assignees]) => ({ deptId, assignees }))
+                          .map(({ deptId, assignees }) => (
+                            <CommandGroup key={deptId} heading={
+                              // try to find human-friendly name from availableDepartments
+                              (availableDepartments.find(d => d.departmentId === deptId) || { name_en: deptId }).name_en
+                            }>
+                              {assignees.map(a => (
+                                <CommandItem
+                                  key={a.gid}
+                                  value={`${a.gid} ${a.email ?? a.name ?? ''}`}
+                                  onSelect={() => {
+                                    setAssigneePopoverOpen(false);
+                                    router.push(`/dashboard/${a.gid}`);
+                                  }}
+                                  className="flex items-center gap-2"
+                                >
+                                  <span className="truncate">{a.email ?? a.name}</span>
+                                  <Check className={assignee.gid === a.gid ? 'ml-auto opacity-100' : 'ml-auto opacity-0'} />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          ))
+                        ) : (
+                          availableAssignees.map((a) => (
+                            <CommandItem
+                              key={a.gid}
+                              // include email (and name) in the value so cmdk will match on typed email substrings
+                              value={`${a.gid} ${a.email ?? a.name ?? ''}`}
+                              onSelect={() => {
+                                setAssigneePopoverOpen(false);
+                                router.push(`/dashboard/${a.gid}`);
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <span className="truncate">{a.email}</span>
+                              <Check className={assignee.gid === a.gid ? 'ml-auto opacity-100' : 'ml-auto opacity-0'} />
+                            </CommandItem>
+                          ))
+                        )}
                       </CommandList>
                     </Command>
                   </PopoverContent>

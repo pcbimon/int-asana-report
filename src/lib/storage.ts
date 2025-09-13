@@ -75,6 +75,12 @@ interface SyncMetadataRow {
   record_count: number | null;
 }
 
+interface DepartmentRow {
+  departmentid: string;
+  name_en: string;
+  assignees: AssigneeRow[] | null;
+}
+
 /**
  * Convert model objects to database rows
  */
@@ -667,5 +673,68 @@ export async function clearAllData(): Promise<void> {
   } catch (error) {
     console.error('Error clearing data:', error);
     throw error;
+  }
+}
+
+/**
+ * Get departments with grouped assignees for admin UI
+ */
+export async function getDepartmentsWithAssignees(): Promise<{ departmentId: string; name_en: string; assignee: Assignee[] }[]> {
+  try {
+    // Query departments and aggregate assignees into JSON
+    const { data, error } = await getSupabaseClient()
+      .from('departments')
+      .select(`departmentid, name_en, assignee_department(assignee_gid), assignees:assignee_department!inner(assignee_gid)`);
+
+    // Fallback: if PostgREST nested select didn't return expected shape, run a raw join
+    if (error || !data) {
+      // Use a safer approach: fetch departments then fetch mappings
+      const { data: deps, error: depsErr } = await getSupabaseClient().from('departments').select('*').order('departmentid');
+      if (depsErr) throw new Error(`Failed to load departments: ${depsErr.message}`);
+
+      const result: { departmentId: string; name_en: string; assignee: Assignee[] }[] = [];
+      for (const d of deps || []) {
+        const { data: mappingRows, error: mapErr } = await getSupabaseClient()
+          .from('assignee_department')
+          .select('assignee_gid')
+          .eq('departmentid', d.departmentid);
+        if (mapErr) throw new Error(`Failed to load mapping for ${d.departmentid}: ${mapErr.message}`);
+
+        const assignees: Assignee[] = [];
+        for (const m of (mappingRows || [])) {
+          const { data: aRow, error: aErr } = await getSupabaseClient().from('assignees').select('*').eq('gid', m.assignee_gid).single();
+          if (!aErr && aRow) assignees.push(rowToAssignee(aRow as AssigneeRow));
+        }
+
+        result.push({ departmentId: d.departmentid, name_en: d.name_en, assignee: assignees });
+      }
+
+      return result;
+    }
+
+    // If we reached here, `data` may contain departments; normalize as needed
+    // Note: the direct nested select above may not be portable; attempt to map responsively
+    const rows = data as any[];
+    const out: { departmentId: string; name_en: string; assignee: Assignee[] }[] = [];
+    for (const r of rows) {
+      // Try to find assignee list in several possible keys
+      const assigneesRaw: any[] = r.assignees || r.assignee_department || [];
+      const assignees: Assignee[] = (assigneesRaw || []).map(ar => {
+        // If object has gid/email/name, convert; if it's only assignee_gid, lookup
+        if (ar && ar.gid) return rowToAssignee(ar as AssigneeRow);
+        if (ar && ar.assignee_gid) {
+          // lookup single assignee
+          return rowToAssignee({ gid: ar.assignee_gid, name: null, email: null } as AssigneeRow);
+        }
+        return null;
+      }).filter(Boolean) as Assignee[];
+
+      out.push({ departmentId: r.departmentid, name_en: r.name_en, assignee: assignees });
+    }
+
+    return out;
+  } catch (error) {
+    console.error('Error getting departments with assignees:', error);
+    return [];
   }
 }
