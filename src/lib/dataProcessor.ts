@@ -39,7 +39,8 @@ function normalizeTimestamp(timestamp?: string): string | null {
  * Get ISO week string from date (YYYY-Www format)
  */
 function getISOWeek(dateString: string): string {
-  return dayjs(dateString).utc().format('YYYY-[W]WW');
+  const d = dayjs(dateString).utc();
+  return `${d.year()}-W${String(d.isoWeek()).padStart(2, '0')}`;
 }
 
 /**
