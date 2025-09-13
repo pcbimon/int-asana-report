@@ -40,7 +40,8 @@ Data model (TypeScript)
 - class Section { gid: string; name: string; tasks: Task[]; }
 - class Task { gid: string; name: string; assignee?: Assignee; completed: boolean; completed_at?: string; subtasks?: Subtask[]; due_on?: string; project?: string; }
 - class Assignee { gid: string; name: string; email?: string; }
-- class Subtask { gid: string; name: string; assignee?: Assignee; completed: boolean; created_at?: string; completed_at?: string; }
+- class Subtask { gid: string; name: string; assignee?: Assignee; completed: boolean; created_at?: string; completed_at?: string; due_on?: string; parent_task_gid: string; }
+- class FollowerTask { subTask: Subtask; user: Assignee; }
 
 Asana API helpers (/lib/asanaApi.ts)
 - fetchSections(): GET {{BASE_URL}}/projects/{{PROJECT_ID}}/sections
@@ -99,6 +100,7 @@ Storage and sync (/lib/storage.ts)
   - sync_metadata(key TEXT PK, updated_at TIMESTAMP)
   - user_roles(uid UUID PK, role TEXT) // for auth roles
   - user_assignees(uid UUID PK, assignee_gid TEXT) // map user to assignee
+  - followers(subtask_gid TEXT PK, assignee_gid UUID PK) // map subtask to followers
 - Roles:
   - admin: full access to all data and sync and can view all assignees by default
   - user: read-only access to their own assignee data
@@ -136,7 +138,7 @@ UI & Components
 - KpiCards: total tasks, completed, completion rate, overdue, avg time.
 - Charts: use ECharts React wrapper, responsive. Provide props for data, color theme, tooltip, legend.
   - Weekly Line: tasks assigned vs completed per week; overlay Expected completion tasks line.
-- CurrentTasksTable: columns: Task, Project/Section, Due date, Status, Priority. Support sort, filter, search, pagination.
+- CurrentTasksTable: columns: Task(display sub task name),Assign Status(Owner, Followers), Project/Section, Due date, Status, Priority. Support sort, filter, search, pagination.
 - FiltersPanel: time-range, project, status. Persist filters in URL query params.
 Note : Expected completion tasks is single line from constant by env var NEXT_EXPECTED_COMPLETION_TASKS (e.g. 3 tasks per week).
 

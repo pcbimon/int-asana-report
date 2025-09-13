@@ -32,6 +32,36 @@ export type Database = {
         }
         Relationships: []
       }
+      followers: {
+        Row: {
+          assignee_gid: string
+          subtask_gid: string
+        }
+        Insert: {
+          assignee_gid: string
+          subtask_gid: string
+        }
+        Update: {
+          assignee_gid?: string
+          subtask_gid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followers_assignee_gid_fkey"
+            columns: ["assignee_gid"]
+            isOneToOne: false
+            referencedRelation: "assignees"
+            referencedColumns: ["gid"]
+          },
+          {
+            foreignKeyName: "followers_subtask_gid_fkey"
+            columns: ["subtask_gid"]
+            isOneToOne: false
+            referencedRelation: "subtasks"
+            referencedColumns: ["gid"]
+          },
+        ]
+      }
       sections: {
         Row: {
           gid: string
@@ -53,30 +83,30 @@ export type Database = {
           completed: boolean | null
           completed_at: string | null
           created_at: string | null
+          due_on: string | null
           gid: string
           name: string | null
           parent_task_gid: string | null
-          due_on: string | null
         }
         Insert: {
           assignee_gid?: string | null
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
+          due_on?: string | null
           gid: string
           name?: string | null
           parent_task_gid?: string | null
-          due_on?: string | null
         }
         Update: {
           assignee_gid?: string | null
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
+          due_on?: string | null
           gid?: string
           name?: string | null
           parent_task_gid?: string | null
-          due_on?: string | null
         }
         Relationships: [
           {
@@ -98,14 +128,23 @@ export type Database = {
       sync_metadata: {
         Row: {
           key: string
+          message: string | null
+          record_count: number | null
+          status: string | null
           updated_at: string | null
         }
         Insert: {
           key: string
+          message?: string | null
+          record_count?: number | null
+          status?: string | null
           updated_at?: string | null
         }
         Update: {
           key?: string
+          message?: string | null
+          record_count?: number | null
+          status?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -361,4 +400,4 @@ export const Constants = {
   public: {
     Enums: {},
   },
-} as const;
+} as const
