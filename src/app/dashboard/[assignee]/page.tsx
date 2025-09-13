@@ -212,7 +212,6 @@ async function DashboardContent({ assigneeGid, userRole }: { assigneeGid: string
       availableDepartments = [];
     }
   }
-
   return (
     <DashboardClient
       assignee={assignee}
