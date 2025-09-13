@@ -17,6 +17,11 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { 
   Search, 
   ChevronUp, 
@@ -182,7 +187,7 @@ export function CurrentTasksTable({
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
-    return dayjs(dateString).format('MMM DD, YYYY');
+    return dayjs(dateString).format('DD MMM YYYY');
   };
 
   const getStatusBadge = (item: TaskWithContext) => {
@@ -323,9 +328,17 @@ export function CurrentTasksTable({
                         <div className="text-sm">
                           {formatDate(item.subtask.created_at)}
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {item.createdWeek}
-                        </div>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <div className="text-xs text-gray-500">
+                              {item.createdWeek}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Start Week Date: {formatDate(item.createdWeek)}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        
                       </TableCell>
                       <TableCell>
                         {formatDate(item.subtask.due_on)}
