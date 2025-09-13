@@ -174,7 +174,8 @@ export function DashboardClient({
                         {availableAssignees.map((a) => (
                           <CommandItem
                             key={a.gid}
-                            value={a.gid}
+                            // include email (and name) in the value so cmdk will match on typed email substrings
+                            value={`${a.gid} ${a.email ?? a.name ?? ''}`}
                             onSelect={() => {
                               setAssigneePopoverOpen(false);
                               router.push(`/dashboard/${a.gid}`);
