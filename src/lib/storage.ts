@@ -158,19 +158,19 @@ function rowToTask(row: TaskRow, assignee?: Assignee): Task {
   };
 }
 
-function rowToSubtask(row: SubtaskRow, assignee?: Assignee): Subtask {
+function rowToSubtask(row: SubtaskRow, assignee?: Assignee, followers?: Assignee[]): Subtask {
   return {
     gid: row.gid,
     name: row.name,
     parent_task_gid: row.parent_task_gid,
     assignee: assignee,
+    followers: followers || [],
     completed: row.completed,
     created_at: row.created_at || undefined,
     completed_at: row.completed_at || undefined,
     due_on: row.due_on || undefined,
   };
 }
-
 /**
  * Save complete AsanaReport to Supabase with upsert operations
  */
@@ -203,7 +203,7 @@ export async function saveReport(
         task.subtasks?.forEach(subtask => {
           subtaskRows.push(subtaskToRow(subtask));
           subtask.followers?.forEach(follower => {
-            followerRows.push(followerToRow(follower));
+            followerRows.push(followerToRow({subtask_gid: subtask.gid, assignee_gid: follower.gid}));
           });
         });
       });
@@ -318,7 +318,20 @@ export async function loadReport(): Promise<AsanaReport> {
     // task assignee: gid, name, email
     // subtasks: gid, name, parent_task_gid, assignee_gid, completed, created_at, completed_at
     // subtask assignee: gid, name, email
-    const selectString = `gid,name, tasks(gid,name,section_gid,assignee_gid,completed,completed_at,due_on,project,created_at, assignee:assignees(gid,name,email), subtasks(gid,name,parent_task_gid,assignee_gid,completed,created_at,completed_at, due_on, assignee:assignees(gid,name,email)))`;
+    const selectString = `
+    gid,name,
+    tasks(
+      gid,name,section_gid,assignee_gid,completed,completed_at,due_on,project,created_at,
+      assignee:assignees!tasks_assignee_gid_fkey(gid,name,email),
+      subtasks(
+        gid,name,parent_task_gid,assignee_gid,completed,created_at,completed_at,due_on,
+        assignee:assignees!subtasks_assignee_gid_fkey(gid,name,email),
+        followers(
+          assignee_gid,
+          assignee:assignees!followers_assignee_gid_fkey(gid,name,email)
+        )
+      )
+    )`;
 
     const { data: nestedSections, error: nestedError } = await getSupabaseClient()
       .from('sections')
@@ -334,18 +347,16 @@ export async function loadReport(): Promise<AsanaReport> {
     }
 
     // Map nested result into models
-    const sections: Section[] = (nestedSections as any[]).map((sectionRow) => {
+    const sections: Section[] = (nestedSections).map((sectionRow) => {
       const section = rowToSection({
         gid: sectionRow.gid,
         name: sectionRow.name,
       } as SectionRow);
 
       const tasksRaw = sectionRow.tasks || [];
-      section.tasks = tasksRaw.map((t: any) => {
+      section.tasks = tasksRaw.map((t) => {
         // t.assignee may be null or an array depending on PostgREST; normalize
-        const taskAssigneeRow = Array.isArray(t.assignee)
-          ? t.assignee[0]
-          : t.assignee || null;
+        const taskAssigneeRow = t.assignee_gid != null? t.assignee : null;
         const taskAssignee = taskAssigneeRow
           ? rowToAssignee(taskAssigneeRow as AssigneeRow)
           : undefined;
@@ -366,13 +377,12 @@ export async function loadReport(): Promise<AsanaReport> {
         );
 
         const subtasksRaw = t.subtasks || [];
-        task.subtasks = subtasksRaw.map((s: any) => {
-          const subAssigneeRow = Array.isArray(s.assignee)
-            ? s.assignee[0]
-            : s.assignee || null;
+        task.subtasks = subtasksRaw.map((s) => {
+          const subAssigneeRow = s.assignee_gid != null ? s.assignee : null;
           const subAssignee = subAssigneeRow
             ? rowToAssignee(subAssigneeRow as AssigneeRow)
             : undefined;
+          const followersRaw = s.followers || [];
 
           return rowToSubtask(
             {
@@ -385,7 +395,8 @@ export async function loadReport(): Promise<AsanaReport> {
               completed_at: s.completed_at || null,
               due_on: s.due_on || null,
             } as SubtaskRow,
-            subAssignee
+            subAssignee,
+            followersRaw.map(f => rowToAssignee(f.assignee as AssigneeRow))
           );
         });
 

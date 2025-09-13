@@ -19,7 +19,7 @@ export interface Subtask {
   completed_at?: string;
   due_on?: string;
   parent_task_gid?: string;
-  followers?: Follower[];
+  followers?: Assignee[];
 }
 export interface Follower{
   subtask_gid: string;
