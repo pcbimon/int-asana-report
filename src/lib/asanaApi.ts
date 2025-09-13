@@ -229,7 +229,7 @@ export async function fetchSubtasks(taskGid: string): Promise<Subtask[]> {
       completed_at: subtask.completed_at,
       parent_task_gid: taskGid,
       due_on: subtask.due_on,
-      followers: subtask.followers?.map(follower => ({subtask_gid: subtask.gid, assignee_gid: follower.gid})) || [],
+      followers: subtask.followers?.map(follower => ({gid: follower.gid, name: follower.name})) || [],
     }));
   } catch (error) {
     console.error(`Error fetching subtasks for task ${taskGid}:`, error);
