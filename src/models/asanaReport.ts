@@ -162,6 +162,7 @@ export interface WeeklyData {
   weekStart: string;      // Start date of the week (ISO date)
   assigned: number;       // Count of subtasks created this week
   completed: number;      // Count of subtasks completed this week
+  overdue: number;        // Count of subtasks that became overdue this week
 }
 
 /**

@@ -85,14 +85,14 @@ function generateWeeklyTimeseries(
   endWeek?: string
 ): WeeklyData[] {
   // Map keys are ISO week strings in format YYYY-Www (e.g. 2025-W37)
-  const weeklyMap = new Map<string, { assigned: number; completed: number }>();
+  const weeklyMap = new Map<string, { assigned: number; completed: number; overdue: number }>();
   // Process subtasks for assigned and completed counts
   subtasks.forEach(subtask => {
     // Count assigned (created) subtasks
     if (subtask.created_at) {
       const isoWeekKey = getISOWeek(subtask.created_at);
       if (!weeklyMap.has(isoWeekKey)) {
-        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0 });
+        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0, overdue: 0 });
       }
       weeklyMap.get(isoWeekKey)!.assigned++;
     }
@@ -101,9 +101,18 @@ function generateWeeklyTimeseries(
     if (subtask.completed_at) {
       const isoWeekKey = getISOWeek(subtask.completed_at);
       if (!weeklyMap.has(isoWeekKey)) {
-        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0 });
+        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0, overdue: 0 });
       }
       weeklyMap.get(isoWeekKey)!.completed++;
+    }
+
+    // Count overdue subtasks by the week of due_on (only if currently overdue and not completed)
+    if (subtask.due_on && !subtask.completed && isSubtaskOverdue(subtask)) {
+      const isoWeekKey = getISOWeek(subtask.due_on);
+      if (!weeklyMap.has(isoWeekKey)) {
+        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0, overdue: 0 });
+      }
+      weeklyMap.get(isoWeekKey)!.overdue++;
     }
   });
   // Determine date range - default to 52 weeks from last year to current week
@@ -124,15 +133,16 @@ function generateWeeklyTimeseries(
 
   while (current.isSameOrBefore(endDate)) {
     const isoWeekKey = getISOWeek(current.toISOString());
-    const weekData = weeklyMap.get(isoWeekKey) || { assigned: 0, completed: 0 };
+  const weekData = weeklyMap.get(isoWeekKey) || { assigned: 0, completed: 0, overdue: 0 };
 
     result.push({
       // week should be YYYY-Www
       week: isoWeekKey,
       // weekStart should be the ISO timestamp of the start of the week (Monday)
       weekStart: current.toISOString(),
-      assigned: weekData.assigned,
-      completed: weekData.completed,
+  assigned: weekData.assigned,
+  completed: weekData.completed,
+  overdue: weekData.overdue,
     });
 
     current = current.add(1, 'week');

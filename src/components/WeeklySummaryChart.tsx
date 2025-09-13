@@ -36,15 +36,17 @@ export function WeeklySummaryChart({
 
     // Prepare data
     const weeks = weeklyData.map(d => dayjs(d.weekStart).format('DD MMM YYYY'));
-    const assignedData = weeklyData.map(d => d.assigned);
-    const completedData = weeklyData.map(d => d.completed);
-    const expectedData = weeklyData.map(() => expectedCompletionTasks);
+  const assignedData = weeklyData.map(d => d.assigned);
+  const completedData = weeklyData.map(d => d.completed);
+  const overdueData = weeklyData.map(d => d.overdue || 0);
+  const expectedData = weeklyData.map(() => expectedCompletionTasks);
 
   // Determine y-axis bounds: ensure integer ticks and step of 1
   const maxAssignedValue = Math.max(...assignedData, 0);
   const maxCompletedValue = Math.max(...completedData, 0);
+  const maxOverdueValue = Math.max(...overdueData, 0);
   const maxExpectedValue = Math.max(...expectedData, 0);
-  const rawMax = Math.max(maxAssignedValue, maxCompletedValue, maxExpectedValue);
+  const rawMax = Math.max(maxAssignedValue, maxCompletedValue, maxOverdueValue, maxExpectedValue);
   // Round up to nearest integer; ensure at least 1 so axis shows something when rawMax is 0
   const yMax = Math.max(1, Math.ceil(rawMax));
 
@@ -75,6 +77,7 @@ export function WeeklySummaryChart({
           const assigned = params.find((p: any) => p.seriesName === 'Assigned')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
           const completed = params.find((p: any) => p.seriesName === 'Completed')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
           const expected = params.find((p: any) => p.seriesName === 'Expected')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
+          const overdue = params.find((p: any) => p.seriesName === 'Overdue')?.value || 0; // eslint-disable-line @typescript-eslint/no-explicit-any
           
           return `
             <div style="padding: 8px;">
@@ -87,6 +90,10 @@ export function WeeklySummaryChart({
                 <span style="display: inline-block; width: 10px; height: 10px; background-color: #10b981; border-radius: 50%; margin-right: 8px;"></span>
                 Completed: ${completed}
               </div>
+                <div style="display: flex; align-items: center; margin-bottom: 2px;">
+                  <span style="display: inline-block; width: 10px; height: 10px; background-color: #ef4444; border-radius: 50%; margin-right: 8px;"></span>
+                  Overdue: ${overdue}
+                </div>
               <div style="display: flex; align-items: center;">
                 <span style="display: inline-block; width: 10px; height: 10px; background-color: #f59e0b; border-radius: 50%; margin-right: 8px;"></span>
                 Expected: ${expected}
@@ -96,7 +103,7 @@ export function WeeklySummaryChart({
         },
       },
       legend: {
-        data: ['Assigned', 'Completed', 'Expected'],
+        data: ['Assigned', 'Completed', 'Overdue', 'Expected'],
         bottom: 10,
         textStyle: {
           color: '#374151',
@@ -189,6 +196,31 @@ export function WeeklySummaryChart({
           symbol: 'circle',
           symbolSize: 6,
           smooth: true,
+        },
+        {
+          name: 'Overdue',
+          type: 'line',
+          data: overdueData,
+          itemStyle: {
+            color: '#ef4444',
+          },
+          lineStyle: {
+            color: '#ef4444',
+            width: 2,
+          },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(239, 68, 68, 0.28)' },
+              { offset: 1, color: 'rgba(239, 68, 68, 0.06)' },
+            ]),
+          },
+          emphasis: {
+            focus: 'series'
+          },
+          symbol: 'circle',
+          symbolSize: 6,
+          smooth: true,
+          z: 2,
         },
         {
           name: 'Expected',
