@@ -284,6 +284,15 @@ export function CurrentTasksTable({
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => handleSort('sectionName')}
+                    >
+                      <div className="flex items-center">
+                        Section
+                        <SortIcon field="sectionName" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-gray-50"
                       onClick={() => handleSort('createdWeek')}
                     >
                       <div className="flex items-center">
@@ -323,6 +332,9 @@ export function CurrentTasksTable({
                             {item.subtask.name}
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {item.sectionName}
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
