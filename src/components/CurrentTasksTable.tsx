@@ -193,7 +193,7 @@ export function CurrentTasksTable({
   const getStatusBadge = (item: TaskWithContext) => {
     if (item.subtask.completed) {
       return (
-        <Badge variant="default" className="bg-green-100 text-green-800">
+        <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-200">
           <CheckCircle className="w-3 h-3 mr-1" />
           Completed
         </Badge>
