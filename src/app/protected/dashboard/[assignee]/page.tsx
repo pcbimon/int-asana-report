@@ -38,7 +38,9 @@ function DashboardSkeleton() {
 }
 
 export default async function DashboardPage({ params }: DashboardPageProps) {
-  const assigneeGid = decodeURIComponent(params.assignee);
+  // Next.js may pass params as a Promise — await to ensure we can read properties safely
+  const resolvedParams = await (params as unknown as Promise<{ assignee: string }> | { assignee: string });
+  const assigneeGid = decodeURIComponent((resolvedParams as any).assignee);
 
   try {
     // Check authentication
@@ -86,8 +88,8 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
       );
     }
 
-    // Load data from Supabase
-    const report = await loadReport();
+  // Load data from Supabase (filtered to this assignee)
+  const report = await loadReport(assigneeGid);
     
     // Find the assignee
     const allAssignees = report.getAllAssignees();
@@ -177,10 +179,12 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
 
 // Generate metadata for the page
 export async function generateMetadata({ params }: DashboardPageProps) {
-  const assigneeGid = decodeURIComponent(params.assignee);
-  console.log(`Generating metadata for assigneeGid: ${assigneeGid}`);
+  // Next.js may pass params as a Promise — await to ensure we can read properties safely
+  const resolvedParams = await (params as unknown as Promise<{ assignee: string }> | { assignee: string });
+  const assigneeGid = decodeURIComponent((resolvedParams as any).assignee);
+
   try {
-    const report = await loadReport();
+  const report = await loadReport(assigneeGid);
     const assignee = report.getAllAssignees().find(a => a.gid === assigneeGid);
     
     return {
