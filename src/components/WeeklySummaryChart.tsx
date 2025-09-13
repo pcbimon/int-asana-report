@@ -40,7 +40,15 @@ export function WeeklySummaryChart({
     const completedData = weeklyData.map(d => d.completed);
     const expectedData = weeklyData.map(() => expectedCompletionTasks);
 
-    // Chart configuration
+  // Determine y-axis bounds: ensure integer ticks and step of 1
+  const maxAssignedValue = Math.max(...assignedData, 0);
+  const maxCompletedValue = Math.max(...completedData, 0);
+  const maxExpectedValue = Math.max(...expectedData, 0);
+  const rawMax = Math.max(maxAssignedValue, maxCompletedValue, maxExpectedValue);
+  // Round up to nearest integer; ensure at least 1 so axis shows something when rawMax is 0
+  const yMax = Math.max(1, Math.ceil(rawMax));
+
+  // Chart configuration
     const option: echarts.EChartsOption = {
       title: {
         text: title,
@@ -119,6 +127,9 @@ export function WeeklySummaryChart({
       yAxis: {
         type: 'value',
         name: 'Tasks',
+        min: 0,
+        max: yMax,
+        interval: 1,
         nameTextStyle: {
           color: '#6b7280',
         },
