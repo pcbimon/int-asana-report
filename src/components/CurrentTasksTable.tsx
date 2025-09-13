@@ -4,7 +4,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Subtask, Section } from '@/models/asanaReport';
+import { Subtask, Section, Assignee } from '@/models/asanaReport';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +35,8 @@ interface TaskWithContext {
   sectionName: string;
   createdWeek: string;
   isOverdue: boolean;
+  type: 'Owner' | 'Collaborator';
+  followers: Assignee[];
 }
 
 interface CurrentTasksTableProps {
@@ -64,23 +66,43 @@ export function CurrentTasksTable({
     sections.forEach(section => {
       section.tasks.forEach(task => {
         task.subtasks?.forEach(subtask => {
-          if (subtask.assignee?.gid === assigneeGid) {
-            const isOverdue = subtask.due_on && 
-              !subtask.completed && 
-              dayjs(subtask.due_on).isBefore(dayjs(), 'day');
-            
-            const createdWeek = subtask.created_at 
-              ? dayjs(subtask.created_at).format('DD MMM YYYY')
-              : 'Unknown';
+          // Include subtasks where the current user is the assignee (Owner)
+          // or where the current user is in the followers (Collaborator)
+          const isOwner = subtask.assignee?.gid === assigneeGid;
+          const isFollower = subtask.followers?.some(f => f.gid === assigneeGid) || false;
 
-            result.push({
-              subtask,
-              taskName: subtask.name,
-              sectionName: section.name,
-              createdWeek,
-              isOverdue: Boolean(isOverdue),
-            });
+          if (!isOwner && !isFollower) return; // skip unrelated subtasks
+
+          const isOverdue = subtask.due_on && 
+            !subtask.completed && 
+            dayjs(subtask.due_on).isBefore(dayjs(), 'day');
+
+          const createdWeek = subtask.created_at 
+            ? dayjs(subtask.created_at).format('DD MMM YYYY')
+            : 'Unknown';
+
+          // Build followers list: include existing followers and ensure the assignee
+          // is present (so we can display them as Owner in the follower list)
+          const followersMap = new Map<string, Assignee>();
+          (subtask.followers || []).forEach(f => followersMap.set(f.gid, f));
+          if (subtask.assignee) {
+            // add assignee to followers list if not already present
+            if (!followersMap.has(subtask.assignee.gid)) {
+              followersMap.set(subtask.assignee.gid, subtask.assignee);
+            }
           }
+
+          const followers = Array.from(followersMap.values());
+
+          result.push({
+            subtask,
+            taskName: subtask.name,
+            sectionName: section.name,
+            createdWeek,
+            isOverdue: Boolean(isOverdue),
+            type: isOwner ? 'Owner' : 'Collaborator',
+            followers,
+          });
         });
       });
     });
@@ -94,10 +116,12 @@ export function CurrentTasksTable({
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
+        const followerNames = (item.followers || []).map(f => f.name.toLowerCase()).join(' ');
         const matchesSearch = 
           item.subtask.name.toLowerCase().includes(query) ||
           item.taskName.toLowerCase().includes(query) ||
-          item.sectionName.toLowerCase().includes(query);
+          item.sectionName.toLowerCase().includes(query) ||
+          followerNames.includes(query);
         
         if (!matchesSearch) return false;
       }
@@ -313,6 +337,12 @@ export function CurrentTasksTable({
                         <SortIcon field="status" />
                       </div>
                     </TableHead>
+                    <TableHead>
+                      Type
+                    </TableHead>
+                    <TableHead>
+                      Followers
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -339,6 +369,29 @@ export function CurrentTasksTable({
                       </TableCell>
                       <TableCell>
                         {getStatusBadge(item)}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <Badge variant={item.type === 'Owner' ? 'default' : 'secondary'}>
+                            {item.type}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          {item.followers && item.followers.length > 0 ? (
+                            item.followers.map((f) => {
+                              const isOwner = item.subtask.assignee && f.gid === item.subtask.assignee.gid;
+                              return (
+                                <Badge key={f.gid} className={isOwner ? 'bg-blue-100 text-blue-800' : ''}>
+                                  {f.name}{isOwner ? ' (Owner)' : ''}
+                                </Badge>
+                              );
+                            })
+                          ) : (
+                            <span className="text-sm text-gray-500">-</span>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
