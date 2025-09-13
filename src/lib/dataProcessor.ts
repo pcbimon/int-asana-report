@@ -89,20 +89,21 @@ function generateWeeklyTimeseries(
   subtasks.forEach(subtask => {
     // Count assigned (created) subtasks
     if (subtask.created_at) {
-      const assignedWeek = getISOWeek(subtask.created_at);
-      if (!weeklyMap.has(assignedWeek)) {
-        weeklyMap.set(assignedWeek, { assigned: 0, completed: 0 });
+      // Use week start date (DD-MM-YYYY) as the map key so it matches the output format
+      const assignedWeekStart = dayjs(subtask.created_at).utc().startOf('isoWeek').format('DD-MM-YYYY');
+      if (!weeklyMap.has(assignedWeekStart)) {
+        weeklyMap.set(assignedWeekStart, { assigned: 0, completed: 0 });
       }
-      weeklyMap.get(assignedWeek)!.assigned++;
+      weeklyMap.get(assignedWeekStart)!.assigned++;
     }
     
     // Count completed subtasks
     if (subtask.completed_at) {
-      const completedWeek = getISOWeek(subtask.completed_at);
-      if (!weeklyMap.has(completedWeek)) {
-        weeklyMap.set(completedWeek, { assigned: 0, completed: 0 });
+      const completedWeekStart = dayjs(subtask.completed_at).utc().startOf('isoWeek').format('DD-MM-YYYY');
+      if (!weeklyMap.has(completedWeekStart)) {
+        weeklyMap.set(completedWeekStart, { assigned: 0, completed: 0 });
       }
-      weeklyMap.get(completedWeek)!.completed++;
+      weeklyMap.get(completedWeekStart)!.completed++;
     }
   });
   
@@ -124,16 +125,17 @@ function generateWeeklyTimeseries(
   const endDate = dayjs(getWeekStart(end));
   
   while (current.isSameOrBefore(endDate)) {
+    // Use DD-MM-YYYY formatted week start to look up counts populated above
     const weekString = current.utc().startOf('isoWeek').format('DD-MM-YYYY');
     const weekData = weeklyMap.get(weekString) || { assigned: 0, completed: 0 };
-    
+
     result.push({
       week: weekString,
       weekStart: current.toISOString(),
       assigned: weekData.assigned,
       completed: weekData.completed,
     });
-    
+
     current = current.add(1, 'week');
   }
   
