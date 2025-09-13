@@ -181,7 +181,6 @@ export async function generateMetadata({ params }: DashboardPageProps) {
   console.log(`Generating metadata for assigneeGid: ${assigneeGid}`);
   try {
     const report = await loadReport();
-    console.log(report.getAllAssignees()[0])
     const assignee = report.getAllAssignees().find(a => a.gid === assigneeGid);
     
     return {
