@@ -79,58 +79,58 @@ function calculateLeadTime(createdAt?: string, completedAt?: string): number | n
  * Fills in missing weeks with zero values
  */
 function generateWeeklyTimeseries(
-  subtasks: Subtask[], 
-  startWeek?: string, 
+  subtasks: Subtask[],
+  startWeek?: string,
   endWeek?: string
 ): WeeklyData[] {
+  // Map keys are ISO week strings in format YYYY-Www (e.g. 2025-W37)
   const weeklyMap = new Map<string, { assigned: number; completed: number }>();
-  
+
   // Process subtasks for assigned and completed counts
   subtasks.forEach(subtask => {
     // Count assigned (created) subtasks
     if (subtask.created_at) {
-      // Use week start date (DD-MM-YYYY) as the map key so it matches the output format
-      const assignedWeekStart = dayjs(subtask.created_at).utc().startOf('isoWeek').format('DD-MM-YYYY');
-      if (!weeklyMap.has(assignedWeekStart)) {
-        weeklyMap.set(assignedWeekStart, { assigned: 0, completed: 0 });
+      const isoWeekKey = getISOWeek(subtask.created_at);
+      if (!weeklyMap.has(isoWeekKey)) {
+        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0 });
       }
-      weeklyMap.get(assignedWeekStart)!.assigned++;
+      weeklyMap.get(isoWeekKey)!.assigned++;
     }
-    
+
     // Count completed subtasks
     if (subtask.completed_at) {
-      const completedWeekStart = dayjs(subtask.completed_at).utc().startOf('isoWeek').format('DD-MM-YYYY');
-      if (!weeklyMap.has(completedWeekStart)) {
-        weeklyMap.set(completedWeekStart, { assigned: 0, completed: 0 });
+      const isoWeekKey = getISOWeek(subtask.completed_at);
+      if (!weeklyMap.has(isoWeekKey)) {
+        weeklyMap.set(isoWeekKey, { assigned: 0, completed: 0 });
       }
-      weeklyMap.get(completedWeekStart)!.completed++;
+      weeklyMap.get(isoWeekKey)!.completed++;
     }
   });
-  
+
   // Determine date range - default to 52 weeks from last year to current week
   let start = startWeek;
   let end = endWeek;
-  
+
   if (!start || !end) {
     const now = dayjs().utc();
-    // Build week strings manually to avoid formatting quirks producing extra 'W' characters
     end = `${now.year()}-W${String(now.isoWeek()).padStart(2, '0')}`;
     const startDate = now.subtract(52, 'week');
     start = `${startDate.year()}-W${String(startDate.isoWeek()).padStart(2, '0')}`;
   }
-  
+
   // Generate complete range with zeros for missing weeks
   const result: WeeklyData[] = [];
   let current = dayjs(getWeekStart(start));
   const endDate = dayjs(getWeekStart(end));
-  
+
   while (current.isSameOrBefore(endDate)) {
-    // Use DD-MM-YYYY formatted week start to look up counts populated above
-    const weekString = current.utc().startOf('isoWeek').format('DD-MM-YYYY');
-    const weekData = weeklyMap.get(weekString) || { assigned: 0, completed: 0 };
+    const isoWeekKey = getISOWeek(current.toISOString());
+    const weekData = weeklyMap.get(isoWeekKey) || { assigned: 0, completed: 0 };
 
     result.push({
-      week: weekString,
+      // week should be YYYY-Www
+      week: isoWeekKey,
+      // weekStart should be the ISO timestamp of the start of the week (Monday)
       weekStart: current.toISOString(),
       assigned: weekData.assigned,
       completed: weekData.completed,
@@ -138,7 +138,7 @@ function generateWeeklyTimeseries(
 
     current = current.add(1, 'week');
   }
-  
+
   return result;
 }
 
