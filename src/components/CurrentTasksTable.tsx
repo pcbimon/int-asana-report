@@ -303,15 +303,6 @@ export function CurrentTasksTable({
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => handleSort('sectionName')}
-                    >
-                      <div className="flex items-center">
-                        Section
-                        <SortIcon field="sectionName" />
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-gray-50"
                       onClick={() => handleSort('createdWeek')}
                     >
                       <div className="flex items-center">
@@ -340,9 +331,6 @@ export function CurrentTasksTable({
                     <TableHead>
                       Type
                     </TableHead>
-                    <TableHead>
-                      Followers
-                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -353,10 +341,29 @@ export function CurrentTasksTable({
                           <div className="font-medium text-gray-900">
                             {item.taskName}
                           </div>
+                          {/* Followers on second line of Task column */}
+                          <div className="text-sm text-gray-500 mt-1">
+                            {item.followers && item.followers.length > 0 ? (
+                              (() => {
+                                const maxShow = 3;
+                                const ownerGid = item.subtask.assignee?.gid;
+                                // Show up to maxShow follower names (mark owner)
+                                const display = item.followers.slice(0, maxShow).map(f => (
+                                  f.gid === ownerGid ? `${f.name} (Owner)` : f.name
+                                ));
+                                const extra = item.followers.length - display.length;
+                                return (
+                                  <>
+                                    <span>{display.join(', ')}</span>
+                                    {extra > 0 && <span className="ml-2">+{extra}</span>}
+                                  </>
+                                );
+                              })()
+                            ) : (
+                              <span className="text-sm text-gray-400">No followers</span>
+                            )}
+                          </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {item.sectionName}
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
@@ -377,22 +384,7 @@ export function CurrentTasksTable({
                           </Badge>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {item.followers && item.followers.length > 0 ? (
-                            item.followers.map((f) => {
-                              const isOwner = item.subtask.assignee && f.gid === item.subtask.assignee.gid;
-                              return (
-                                <Badge key={f.gid} className={isOwner ? 'bg-blue-100 text-blue-800' : ''}>
-                                  {f.name}{isOwner ? ' (Owner)' : ''}
-                                </Badge>
-                              );
-                            })
-                          ) : (
-                            <span className="text-sm text-gray-500">-</span>
-                          )}
-                        </div>
-                      </TableCell>
+                      {/* Followers moved to Task column */}
                     </TableRow>
                   ))}
                 </TableBody>
