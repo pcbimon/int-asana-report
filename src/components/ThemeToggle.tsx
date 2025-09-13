@@ -11,7 +11,7 @@ function getInitialTheme(): "light" | "dark" {
     if (stored === "dark" || stored === "light") return stored
     // fallback to prefers-color-scheme
     if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark"
-  } catch (e) {
+  } catch {
     // ignore
   }
   return "light"
@@ -32,7 +32,7 @@ export default function ThemeToggle() {
     }
     try {
       localStorage.setItem(THEME_KEY, theme)
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, [theme])

@@ -155,7 +155,7 @@ function rowToTask(row: TaskRow, assignee?: Assignee): Task {
     if (!iso) return undefined;
     try {
       return dayjs.utc(iso).tz('Asia/Bangkok').format();
-    } catch (e) {
+    } catch {
       return iso as string;
     }
   };
@@ -179,7 +179,7 @@ function rowToSubtask(row: SubtaskRow, assignee?: Assignee, followers?: Assignee
     if (!iso) return undefined;
     try {
       return dayjs.utc(iso).tz('Asia/Bangkok').format();
-    } catch (e) {
+    } catch {
       return iso as string;
     }
   };
@@ -381,7 +381,7 @@ export async function loadReport(assigneeGid?: string): Promise<AsanaReport> {
     // PostgREST `select` with embedded filter syntax for the nested relation.
 
     // Build the final select with an inline filter on subtasks when needed.
-    let finalSelect = selectString;
+    const finalSelect = selectString;
 
     const { data: nestedSections, error: nestedError } = await getSupabaseClient()
       .from('sections')
@@ -397,14 +397,14 @@ export async function loadReport(assigneeGid?: string): Promise<AsanaReport> {
     }
 
     // Map nested result into models
-    const sections: Section[] = (nestedSections as any[]).map((sectionRow: any) => {
+    const sections: Section[] = (nestedSections).map((sectionRow) => {
       const section = rowToSection({
         gid: sectionRow.gid,
         name: sectionRow.name,
       } as SectionRow);
 
       const tasksRaw = sectionRow.tasks || [];
-      section.tasks = tasksRaw.map((t: any) => {
+      section.tasks = tasksRaw.map((t) => {
         // t.assignee may be null or an array depending on PostgREST; normalize
         const taskAssigneeRow = t.assignee_gid != null ? t.assignee : null;
         const taskAssignee = taskAssigneeRow
@@ -431,10 +431,10 @@ export async function loadReport(assigneeGid?: string): Promise<AsanaReport> {
         // to only include those assigned to the given assignee. We perform
         // this filtering here to avoid returning unrelated rows.
         if (assigneeGid) {
-          subtasksRaw = (subtasksRaw as any[]).filter((s: any) => s.assignee_gid === assigneeGid);
+          subtasksRaw = subtasksRaw.filter((s) => s.assignee_gid === assigneeGid);
         }
 
-        task.subtasks = subtasksRaw.map((s: any) => {
+        task.subtasks = subtasksRaw.map((s) => {
           const subAssigneeRow = s.assignee_gid != null ? s.assignee : null;
           const subAssignee = subAssigneeRow
             ? rowToAssignee(subAssigneeRow as AssigneeRow)
@@ -453,7 +453,7 @@ export async function loadReport(assigneeGid?: string): Promise<AsanaReport> {
               due_on: s.due_on || null,
             } as SubtaskRow,
             subAssignee,
-            followersRaw.map((f: any) => rowToAssignee(f.assignee as AssigneeRow))
+            followersRaw.map((f) => rowToAssignee(f.assignee as AssigneeRow))
           );
         });
 
@@ -531,7 +531,7 @@ export async function setLastUpdated(
 
     const { error } = await getSupabaseClient()
       .from('sync_metadata')
-      .upsert(metadata as any, { onConflict: 'key' });
+      .upsert(metadata, { onConflict: 'key' });
 
     if (error) {
       throw new Error(`Failed to update sync metadata: ${error.message}`);
@@ -580,7 +580,7 @@ export async function getUserRole(uid: string): Promise<string | null> {
       throw new Error(`Failed to get user role: ${error.message}`);
     }
 
-    return (data as any)?.role || null;
+    return (data)?.role || null;
 
   } catch (error) {
     console.error('Error getting user role:', error);
@@ -603,7 +603,7 @@ export async function getUserAssignee(uid: string): Promise<string | null> {
       throw new Error(`Failed to get user assignee: ${error.message}`);
     }
 
-    return (data as any)?.assignee_gid || null;
+    return (data)?.assignee_gid || null;
 
   } catch (error) {
     console.error('Error getting user assignee:', error);

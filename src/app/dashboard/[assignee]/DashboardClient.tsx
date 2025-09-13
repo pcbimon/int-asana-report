@@ -12,7 +12,6 @@ import { Header } from '@/components/Header';
 import { KpiCards } from '@/components/KpiCards';
 import { WeeklySummaryChart } from '@/components/WeeklySummaryChart';
 import { CurrentTasksTable } from '@/components/CurrentTasksTable';
-import { FiltersPanel } from '@/components/FiltersPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,14 +44,12 @@ export function DashboardClient({
   assignee,
   metrics,
   sections,
-  availableProjects,
-  availableSections,
   userRole,
   isAdmin,
   lastSyncTime,
   availableAssignees = [],
 }: DashboardClientProps) {
-  const [filters, setFilters] = useState<FilterOptions>({});
+  const [filters] = useState<FilterOptions>({});
   const [isExporting, setIsExporting] = useState(false);
   const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
   const router = useRouter();

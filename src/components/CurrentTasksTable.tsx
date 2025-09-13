@@ -17,11 +17,6 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { 
   Search, 
   ChevronUp, 

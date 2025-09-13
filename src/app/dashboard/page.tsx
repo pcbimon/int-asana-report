@@ -1,8 +1,6 @@
-import Link from 'next/link';
 import { createClient } from '@/lib/server';
 import { notFound, redirect } from 'next/navigation';
-import { getUserRole, getUserAssignee, getAllAssigneesFromDB } from '@/lib/storage';
-import { Card, CardContent } from '@/components/ui/card';
+import { getUserAssignee } from '@/lib/storage';
 
 export default async function DashboardIndexPage() {
   try {
@@ -12,7 +10,7 @@ export default async function DashboardIndexPage() {
       redirect('/auth/login');
     }
 
-    const userRole = await getUserRole(user.id);
+    // const userRole = await getUserRole(user.id);
     const userAssignee = await getUserAssignee(user.id);
 
     if (userAssignee) {
@@ -25,7 +23,7 @@ export default async function DashboardIndexPage() {
     // Next.js uses a thrown control-flow exception for `redirect()` with a digest
     // starting with 'NEXT_REDIRECT'. We must rethrow those so Next can handle
     // the redirect instead of treating it as an application error.
-    const e = error as any;
+    const e = error as { message?: unknown; digest?: unknown };
     const isNextRedirect =
       (typeof e?.message === 'string' && e.message.includes('NEXT_REDIRECT')) ||
       (typeof e?.digest === 'string' && e.digest.startsWith('NEXT_REDIRECT'));

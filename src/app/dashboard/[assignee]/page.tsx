@@ -181,7 +181,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
 
 export async function generateMetadata({ params }: DashboardPageProps) {
   const resolvedParams = await (params as unknown as Promise<{ assignee: string }> | { assignee: string });
-  const assigneeGid = decodeURIComponent((resolvedParams as any).assignee);
+  const assigneeGid = decodeURIComponent((resolvedParams).assignee);
 
   try {
     const report = await loadReport(assigneeGid);

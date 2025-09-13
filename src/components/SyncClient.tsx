@@ -40,7 +40,7 @@ interface SyncProgress {
 
 export function SyncClient({ lastSync, userEmail }: SyncClientProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<SyncProgress[]>([]);
+  const [, setSyncProgress] = useState<SyncProgress[]>([]);
   const [currentSync, setCurrentSync] = useState<SyncMetadata | null>(lastSync);
   const [error, setError] = useState<string | null>(null);
 
