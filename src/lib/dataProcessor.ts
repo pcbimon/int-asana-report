@@ -124,7 +124,7 @@ function generateWeeklyTimeseries(
   const endDate = dayjs(getWeekStart(end));
   
   while (current.isSameOrBefore(endDate)) {
-    const weekString = current.format('YYYY-[W]WW');
+    const weekString = current.utc().startOf('isoWeek').format('DD-MM-YYYY');
     const weekData = weeklyMap.get(weekString) || { assigned: 0, completed: 0 };
     
     result.push({
@@ -174,6 +174,7 @@ export function processAsanaReport(report: AsanaReport): AssigneeMetrics[] {
       task.subtasks?.forEach(subtask => {
         subtask.created_at = normalizeTimestamp(subtask.created_at) || undefined;
         subtask.completed_at = normalizeTimestamp(subtask.completed_at) || undefined;
+        subtask.due_on = normalizeTimestamp(subtask.due_on) || undefined;
         
         // Only process subtasks with assignees
         if (subtask.assignee) {
