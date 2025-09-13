@@ -431,7 +431,13 @@ export async function loadReport(assigneeGid?: string): Promise<AsanaReport> {
         // to only include those assigned to the given assignee. We perform
         // this filtering here to avoid returning unrelated rows.
         if (assigneeGid) {
-          subtasksRaw = subtasksRaw.filter((s) => s.assignee_gid === assigneeGid);
+          // Include subtasks where the provided assigneeGid is either the subtask assignee
+          // or is present in the followers list (follower-only subtasks should be visible)
+          subtasksRaw = subtasksRaw.filter((s) => {
+            if (s.assignee_gid === assigneeGid) return true;
+            const followers = s.followers || [];
+            return followers.some((f: any) => f && f.assignee_gid === assigneeGid);
+          });
         }
 
         task.subtasks = subtasksRaw.map((s) => {
