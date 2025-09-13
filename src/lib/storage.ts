@@ -158,6 +158,7 @@ function rowToSubtask(row: SubtaskRow, assignee?: Assignee): Subtask {
     completed: row.completed,
     created_at: row.created_at || undefined,
     completed_at: row.completed_at || undefined,
+    due_on: row.due_on || undefined,
   };
 }
 
@@ -295,7 +296,7 @@ export async function loadReport(): Promise<AsanaReport> {
     // task assignee: gid, name, email
     // subtasks: gid, name, parent_task_gid, assignee_gid, completed, created_at, completed_at
     // subtask assignee: gid, name, email
-    const selectString = `gid,name, tasks(gid,name,section_gid,assignee_gid,completed,completed_at,due_on,project,created_at, assignee:assignees(gid,name,email), subtasks(gid,name,parent_task_gid,assignee_gid,completed,created_at,completed_at, assignee:assignees(gid,name,email)))`;
+    const selectString = `gid,name, tasks(gid,name,section_gid,assignee_gid,completed,completed_at,due_on,project,created_at, assignee:assignees(gid,name,email), subtasks(gid,name,parent_task_gid,assignee_gid,completed,created_at,completed_at, due_on, assignee:assignees(gid,name,email)))`;
 
     const { data: nestedSections, error: nestedError } = await getSupabaseClient()
       .from('sections')
@@ -360,6 +361,7 @@ export async function loadReport(): Promise<AsanaReport> {
               completed: s.completed,
               created_at: s.created_at || null,
               completed_at: s.completed_at || null,
+              due_on: s.due_on || null,
             } as SubtaskRow,
             subAssignee
           );
