@@ -112,12 +112,11 @@ function subtaskToRow(subtask: Subtask): SubtaskRow {
  * Convert database rows to model objects
  */
 function rowToAssignee(row: AssigneeRow): Assignee {
-  if (!row.name) {
-    throw new Error(`Assignee with gid ${row.gid} has null name`);
-  }
+  // Be tolerant of missing name: prefer name, fallback to email local-part or gid
+  const nameFallback = row.name || (row.email ? row.email.split('@')[0] : row.gid);
   return {
     gid: row.gid,
-    name: row.name,
+    name: nameFallback,
     email: row.email || undefined,
   };
 }
@@ -282,80 +281,96 @@ export async function saveReport(
  */
 export async function loadReport(): Promise<AsanaReport> {
   try {
-    console.log('Starting loadReport operation...');
+    console.log("Starting loadReport operation...");
     const startTime = Date.now();
-    
-    // Load all data in parallel
-    const [
-      { data: assigneeData, error: assigneeError },
-      { data: sectionData, error: sectionError },
-      { data: taskData, error: taskError },
-      { data: subtaskData, error: subtaskError },
-    ] = await Promise.all([
-      getSupabaseClient().from('assignees').select('*'),
-      getSupabaseClient().from('sections').select('*'),
-      getSupabaseClient().from('tasks').select('*'),
-      getSupabaseClient().from('subtasks').select('*'),
-    ]);
-    
-    // Check for errors
-    if (assigneeError) throw new Error(`Failed to load assignees: ${assigneeError.message}`);
-    if (sectionError) throw new Error(`Failed to load sections: ${sectionError.message}`);
-    if (taskError) throw new Error(`Failed to load tasks: ${taskError.message}`);
-    if (subtaskError) throw new Error(`Failed to load subtasks: ${subtaskError.message}`);
-    
-    console.log(
-      `Loaded from database: ${assigneeData?.length || 0} assignees, ` +
-      `${sectionData?.length || 0} sections, ${taskData?.length || 0} tasks, ` +
-      `${subtaskData?.length || 0} subtasks`
-    );
-    
-    // Create assignee lookup map
-    const assigneeMap = new Map<string, Assignee>();
-    (assigneeData || []).forEach(row => {
-      const assignee = rowToAssignee(row as AssigneeRow);
-      assigneeMap.set(assignee.gid, assignee);
-    });
-    // Create subtask lookup map by parent task
-    const subtasksByTask = new Map<string, Subtask[]>();
-    (subtaskData || []).forEach(row => {
-      const subtaskRow = row as SubtaskRow;
-      const assignee = subtaskRow.assignee_gid ? assigneeMap.get(subtaskRow.assignee_gid) : undefined;
-      const subtask = rowToSubtask(subtaskRow, assignee);
-      
-      if (!subtasksByTask.has(subtask.parent_task_gid || '')) {
-        subtasksByTask.set(subtask.parent_task_gid || '', []);
-      }
-      subtasksByTask.get(subtask.parent_task_gid || '')!.push(subtask);
-    });
-    console.log('Subtasks mapped to parent tasks.');
-    // Create task lookup map by section
-    const tasksBySection = new Map<string, Task[]>();
-    (taskData || []).forEach(row => {
-      const taskRow = row as TaskRow;
-      const assignee = taskRow.assignee_gid ? assigneeMap.get(taskRow.assignee_gid) : undefined;
-      const task = rowToTask(taskRow, assignee);
-      
-      // Attach subtasks to task
-      task.subtasks = subtasksByTask.get(task.gid) || [];
-      
-      if (!tasksBySection.has(task.section_gid || '')) {
-        tasksBySection.set(task.section_gid || '', []);
-      }
-      tasksBySection.get(task.section_gid || '')!.push(task);
-    });
-    
-    // Build sections with tasks
-    const sections: Section[] = (sectionData || []).map(row => {
-      const section = rowToSection(row as SectionRow);
-      section.tasks = tasksBySection.get(section.gid) || [];
+
+    // Load sections with nested tasks and subtasks (single query)
+    // We use PostgREST nested selects to fetch tasks and subtasks and include assignee references
+    // Note: aliasing used to avoid name collisions: task_assignee and subtask_assignee
+    // Projection: select only required columns to reduce payload size
+    // sections: gid, name
+    // tasks: gid, name, section_gid, assignee_gid, completed, completed_at, due_on, project, created_at
+    // task assignee: gid, name, email
+    // subtasks: gid, name, parent_task_gid, assignee_gid, completed, created_at, completed_at
+    // subtask assignee: gid, name, email
+    const selectString = `gid,name, tasks(gid,name,section_gid,assignee_gid,completed,completed_at,due_on,project,created_at, assignee:assignees(gid,name,email), subtasks(gid,name,parent_task_gid,assignee_gid,completed,created_at,completed_at, assignee:assignees(gid,name,email)))`;
+
+    const { data: nestedSections, error: nestedError } = await getSupabaseClient()
+      .from('sections')
+      .select(selectString);
+
+    if (nestedError) {
+      throw new Error(`Failed to load nested sections: ${nestedError.message}`);
+    }
+
+    if (!nestedSections) {
+      console.log("No sections found in database.");
+      return new AsanaReport([]);
+    }
+
+    // Map nested result into models
+    const sections: Section[] = (nestedSections as any[]).map((sectionRow) => {
+      const section = rowToSection({
+        gid: sectionRow.gid,
+        name: sectionRow.name,
+      } as SectionRow);
+
+      const tasksRaw = sectionRow.tasks || [];
+      section.tasks = tasksRaw.map((t: any) => {
+        // t.assignee may be null or an array depending on PostgREST; normalize
+        const taskAssigneeRow = Array.isArray(t.assignee)
+          ? t.assignee[0]
+          : t.assignee || null;
+        const taskAssignee = taskAssigneeRow
+          ? rowToAssignee(taskAssigneeRow as AssigneeRow)
+          : undefined;
+
+        const task: Task = rowToTask(
+          {
+            gid: t.gid,
+            name: t.name,
+            section_gid: t.section_gid,
+            assignee_gid: taskAssignee ? taskAssignee.gid : null,
+            completed: t.completed,
+            completed_at: t.completed_at || null,
+            due_on: t.due_on || null,
+            project: t.project || null,
+            created_at: t.created_at || null,
+          } as TaskRow,
+          taskAssignee
+        );
+
+        const subtasksRaw = t.subtasks || [];
+        task.subtasks = subtasksRaw.map((s: any) => {
+          const subAssigneeRow = Array.isArray(s.assignee)
+            ? s.assignee[0]
+            : s.assignee || null;
+          const subAssignee = subAssigneeRow
+            ? rowToAssignee(subAssigneeRow as AssigneeRow)
+            : undefined;
+
+          return rowToSubtask(
+            {
+              gid: s.gid,
+              name: s.name,
+              parent_task_gid: s.parent_task_gid,
+              assignee_gid: subAssignee ? subAssignee.gid : null,
+              completed: s.completed,
+              created_at: s.created_at || null,
+              completed_at: s.completed_at || null,
+            } as SubtaskRow,
+            subAssignee
+          );
+        });
+
+        return task;
+      });
+
       return section;
     });
     const duration = Date.now() - startTime;
     console.log(`loadReport completed in ${duration}ms`);
-    console.log(`Total unique assignees in report: ${assigneeMap.size}`);
     return new AsanaReport(sections);
-    
   } catch (error) {
     console.error('Error in loadReport:', error);
     throw error;
