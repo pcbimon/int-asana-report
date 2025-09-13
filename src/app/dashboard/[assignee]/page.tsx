@@ -1,10 +1,10 @@
 /**
- * Individual Dashboard Page - Dynamic route for assignee
+ * Individual Dashboard Page - Dynamic route for assignee (root-level)
  * Server-side rendered with data from Supabase
  */
 
 import { Suspense } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/server';
 import { loadReport, hasData, getUserRole, getUserAssignee, getLastUpdated, getAllAssigneesFromDB } from '@/lib/storage';
 import { getAssigneeMetrics } from '@/lib/dataProcessor';
@@ -18,7 +18,6 @@ interface DashboardPageProps {
   searchParams: { [key: string]: string | string[] | undefined };
 }
 
-// Loading skeleton component
 function DashboardSkeleton() {
   return (
     <div className="min-h-screen bg-gray-50">
@@ -39,7 +38,6 @@ function DashboardSkeleton() {
 }
 
 export default async function DashboardPage({ params }: DashboardPageProps) {
-  // Next.js may pass params as a Promise — await to ensure we can read properties safely
   const resolvedParams = (await Promise.resolve(params)) as { assignee: string };
   const assigneeGid = decodeURIComponent(resolvedParams.assignee);
 
@@ -49,15 +47,14 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      // Redirect to login (this should be handled by middleware)
-      notFound();
+      // Redirect to login
+      redirect('/auth/login');
     }
 
     // Check if user has access to this assignee
     const userRole = await getUserRole(user.id);
     const userAssignee = await getUserAssignee(user.id);
 
-    // Admin can view any assignee, regular users can only view their own
     if (userRole !== 'admin' && userAssignee !== assigneeGid) {
       notFound();
     }
@@ -77,7 +74,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                   Please sync data from Asana to view the dashboard.
                 </p>
                 <a
-                  href="/protected/sync"
+                  href="/sync"
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   Go to Sync Page
@@ -89,19 +86,15 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
       );
     }
 
-  // Load data from Supabase (filtered to this assignee)
-  const report = await loadReport(assigneeGid);
-    
-    // Find the assignee
+    const report = await loadReport(assigneeGid);
+
     const allAssignees = report.getAllAssignees();
     const assignee = allAssignees.find(a => a.gid === assigneeGid);
     if (!assignee) {
       notFound();
     }
 
-    // Get metrics for this assignee
     const metrics = getAssigneeMetrics(report, assigneeGid);
-    
     if (!metrics) {
       return (
         <div className="min-h-screen bg-gray-50">
@@ -121,16 +114,14 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
       );
     }
 
-    // Get available options for filters
     const availableProjects = Array.from(new Set(
-      report.sections.flatMap(section => 
+      report.sections.flatMap(section =>
         section.tasks.map(task => task.project).filter(Boolean)
       )
     )) as string[];
 
     const availableSections = report.sections.map(section => section.name);
 
-    // If admin, fetch the list of all assignees for the dropdown selector
     let availableAssignees = [] as Assignee[];
     if (userRole === 'admin') {
       try {
@@ -141,11 +132,9 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
       }
     }
 
-    // Get last sync time
     const lastSyncMetadata = await getLastUpdated();
     const lastSyncTime = lastSyncMetadata?.lastUpdated || null;
 
-    // Pass data to client component
     return (
       <Suspense fallback={<DashboardSkeleton />}>
         <DashboardClient
@@ -164,7 +153,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
 
   } catch (error) {
     console.error('Error loading dashboard:', error);
-    
+
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -190,16 +179,14 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   }
 }
 
-// Generate metadata for the page
 export async function generateMetadata({ params }: DashboardPageProps) {
-  // Next.js may pass params as a Promise — await to ensure we can read properties safely
   const resolvedParams = await (params as unknown as Promise<{ assignee: string }> | { assignee: string });
   const assigneeGid = decodeURIComponent((resolvedParams as any).assignee);
 
   try {
-  const report = await loadReport(assigneeGid);
+    const report = await loadReport(assigneeGid);
     const assignee = report.getAllAssignees().find(a => a.gid === assigneeGid);
-    
+
     return {
       title: assignee ? `Dashboard - ${assignee.name}` : 'Dashboard',
       description: `Individual dashboard for ${assignee?.name || 'assignee'} showing task metrics and progress.`,
