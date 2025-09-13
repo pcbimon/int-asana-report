@@ -202,28 +202,17 @@ export function WeeklySummaryChart({
         },
         {
           name: 'Overdue',
-          type: 'line',
+          type: 'bar',
           data: overdueData,
           itemStyle: {
             color: '#ef4444',
           },
-          lineStyle: {
-            color: '#ef4444',
-            width: 2,
-          },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(239, 68, 68, 0.28)' },
-              { offset: 1, color: 'rgba(239, 68, 68, 0.06)' },
-            ]),
-          },
+          // Make overdue visually distinct as red bars
+          barWidth: '40%',
           emphasis: {
-            focus: 'series'
+            focus: 'series',
           },
-          symbol: 'circle',
-          symbolSize: 6,
-          smooth: true,
-          z: 2,
+          z: 3,
         },
         {
           name: 'Collab',
