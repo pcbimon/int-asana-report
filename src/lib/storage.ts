@@ -503,9 +503,17 @@ export async function getLastUpdated(key: string = 'asana_sync'): Promise<SyncMe
     if (!data) return null;
 
     const row = data as SyncMetadataRow;
+    // Convert updated_at (stored as UTC ISO) to Asia/Bangkok timezone string
+    let converted: string | undefined = undefined;
+    try {
+      converted = dayjs.utc(row.updated_at).tz('Asia/Bangkok').format();
+    } catch {
+      converted = row.updated_at;
+    }
+
     return {
       key: row.key,
-      lastUpdated: row.updated_at,
+      lastUpdated: converted,
       status: row.status as 'success' | 'error' | 'in-progress',
       message: row.message || undefined,
       recordCount: row.record_count || undefined,

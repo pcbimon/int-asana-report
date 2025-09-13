@@ -4,7 +4,8 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { SyncMetadata } from '@/models/asanaReport';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,8 +44,40 @@ export function SyncClient({ lastSync, userEmail }: SyncClientProps) {
   const [, setSyncProgress] = useState<SyncProgress[]>([]);
   const [currentSync, setCurrentSync] = useState<SyncMetadata | null>(lastSync);
   const [error, setError] = useState<string | null>(null);
+  const autoTriggeredRef = useRef(false);
+
+  // ms threshold for auto-sync: 1 day
+  const SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  const router = useRouter();
+  // When an auto-triggered sync completes successfully, navigate to the dashboard
+  useEffect(() => {
+    try {
+      if (autoTriggeredRef.current && currentSync?.status === 'success') {
+        router.push('/dashboard');
+      }
+    } catch (err) {
+      console.error('Failed to redirect after auto-sync:', err);
+    }
+  }, [currentSync, router]);
 
   useEffect(() => {
+    // Auto-trigger sync when opening the page if last sync is more than 1 day old
+    // Only run once per component mount (guarded by autoTriggeredRef)
+    try {
+      if (!autoTriggeredRef.current && !isLoading && currentSync && currentSync.lastUpdated) {
+        const lastTime = new Date(currentSync.lastUpdated).getTime();
+        if (isFinite(lastTime) && Date.now() - lastTime > SYNC_MAX_AGE_MS) {
+          // Don't trigger if the last sync is already marked in-progress
+          if (currentSync.status !== 'in-progress') {
+            autoTriggeredRef.current = true;
+            handleSync();
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed during auto-sync check:', err);
+    }
+
     let pollInterval: NodeJS.Timeout;
 
     if (isLoading) {
