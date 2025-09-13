@@ -86,7 +86,6 @@ function generateWeeklyTimeseries(
 ): WeeklyData[] {
   // Map keys are ISO week strings in format YYYY-Www (e.g. 2025-W37)
   const weeklyMap = new Map<string, { assigned: number; completed: number }>();
-
   // Process subtasks for assigned and completed counts
   subtasks.forEach(subtask => {
     // Count assigned (created) subtasks
@@ -107,7 +106,6 @@ function generateWeeklyTimeseries(
       weeklyMap.get(isoWeekKey)!.completed++;
     }
   });
-
   // Determine date range - default to 52 weeks from last year to current week
   let start = startWeek;
   let end = endWeek;

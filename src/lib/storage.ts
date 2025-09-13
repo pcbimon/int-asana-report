@@ -15,6 +15,12 @@ import {
   Follower
 } from '@/models/asanaReport';
 import { Database } from '../../database.types';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 
 function getSupabaseClient() {
@@ -144,21 +150,40 @@ function rowToSection(row: SectionRow): Section {
 }
 
 function rowToTask(row: TaskRow, assignee?: Assignee): Task {
+  // Convert UTC timestamps to Asia/Bangkok (ICT) preserving ISO offset +07:00
+  const conv = (iso?: string | null) => {
+    if (!iso) return undefined;
+    try {
+      return dayjs.utc(iso).tz('Asia/Bangkok').format();
+    } catch (e) {
+      return iso as string;
+    }
+  };
+
   return {
     gid: row.gid,
     name: row.name,
     section_gid: row.section_gid,
     assignee: assignee,
     completed: row.completed,
-    completed_at: row.completed_at || undefined,
+    completed_at: conv(row.completed_at) || undefined,
     due_on: row.due_on || undefined,
     project: row.project || undefined,
-    created_at: row.created_at || undefined,
+    created_at: conv(row.created_at) || undefined,
     subtasks: [], // Will be populated later
   };
 }
 
 function rowToSubtask(row: SubtaskRow, assignee?: Assignee, followers?: Assignee[]): Subtask {
+  const conv = (iso?: string | null) => {
+    if (!iso) return undefined;
+    try {
+      return dayjs.utc(iso).tz('Asia/Bangkok').format();
+    } catch (e) {
+      return iso as string;
+    }
+  };
+
   return {
     gid: row.gid,
     name: row.name,
@@ -166,8 +191,8 @@ function rowToSubtask(row: SubtaskRow, assignee?: Assignee, followers?: Assignee
     assignee: assignee,
     followers: followers || [],
     completed: row.completed,
-    created_at: row.created_at || undefined,
-    completed_at: row.completed_at || undefined,
+    created_at: conv(row.created_at) || undefined,
+    completed_at: conv(row.completed_at) || undefined,
     due_on: row.due_on || undefined,
   };
 }
