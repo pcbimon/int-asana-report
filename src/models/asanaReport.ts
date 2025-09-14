@@ -193,15 +193,17 @@ export interface FilterOptions {
 export interface ExportData {
   taskName: string;
   section: string;
-  project: string;
   assignee: string;
-  assigneeEmail: string;
   status: string;
   createdDate: string;
   completedDate: string;
   dueDate: string;
   leadTime: number;       // Days from created to completed
   isOverdue: boolean;
+  // Optional: when the exported row represents a follower (collaborator)
+  // `assignee` will be the follower's name and `owner` is the actual subtask owner (if any)
+  owner?: string | null;
+  isFollower?: boolean;
 }
 
 /**

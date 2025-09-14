@@ -341,28 +341,59 @@ export function generateExportData(report: AsanaReport, filters?: FilterOptions)
   report.sections.forEach(section => {
     section.tasks.forEach(task => {
       task.subtasks?.forEach(subtask => {
-        // Apply filters if provided
-        if (filters && !filterSubtasks([subtask], filters).length) {
-          return;
-        }
-        
-        // Skip subtasks without assignees
-        if (!subtask.assignee) return;
-        
+        // Export owner row if there is an assignee
         const leadTime = calculateLeadTime(subtask.created_at, subtask.completed_at);
-        
-        exportData.push({
-          taskName: `${task.name} - ${subtask.name}`,
-          section: section.name,
-          project: task.project || 'Unknown',
-          assignee: subtask.assignee.name,
-          assigneeEmail: subtask.assignee.email || '',
-          status: subtask.completed ? 'Completed' : 'Pending',
-          createdDate: subtask.created_at || '',
-          completedDate: subtask.completed_at || '',
-          dueDate: subtask.due_on || '',
-          leadTime: leadTime || 0,
-          isOverdue: isSubtaskOverdue(subtask),
+
+        if (subtask.assignee) {
+          // Apply filters if provided (owner row)
+          if (!filters || filterSubtasks([subtask], filters).length) {
+            exportData.push({
+              taskName: `${subtask.name}`,
+              section: section.name,
+              assignee: subtask.assignee.name,
+              status: subtask.completed ? 'Completed' : 'Pending',
+              createdDate: subtask.created_at || '',
+              completedDate: subtask.completed_at || '',
+              dueDate: subtask.due_on || '',
+              leadTime: leadTime || 0,
+              isOverdue: isSubtaskOverdue(subtask),
+              owner: subtask.assignee.name,
+              isFollower: false,
+            });
+          }
+        }
+
+        // Export rows for followers (collaborators) - include follower even if they are not the assignee
+        (subtask.followers || []).forEach(follower => {
+          if (!follower) return;
+
+          // Skip follower if they are the owner (already exported above)
+          if (subtask.assignee && follower.gid === subtask.assignee.gid) return;
+
+          // Build a pseudo-subtask for filtering purposes where the assignee is the follower
+          const followerSubtask: Subtask = {
+            ...subtask,
+            assignee: follower,
+          } as Subtask;
+
+          // Apply filters if provided (follower row)
+          if (filters && !filterSubtasks([followerSubtask], filters).length) {
+            return;
+          }
+
+          exportData.push({
+            taskName: `${subtask.name}`,
+            section: section.name,
+            assignee: follower.name,
+            status: subtask.completed ? 'Completed' : 'Pending',
+            createdDate: subtask.created_at || '',
+            completedDate: subtask.completed_at || '',
+            dueDate: subtask.due_on || '',
+            leadTime: leadTime || 0,
+            isOverdue: isSubtaskOverdue(subtask),
+            owner: subtask.assignee ? subtask.assignee.name : null,
+            isFollower: true,
+          });
         });
       });
     });
