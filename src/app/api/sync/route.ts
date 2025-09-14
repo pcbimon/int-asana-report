@@ -12,29 +12,42 @@ import { AsanaReport } from '@/models/asanaReport';
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Allow server-to-server scheduled jobs to call this endpoint using a service key
+    const serviceKey = request.headers.get('x-sync-service-key');
+    const expectedKey = process.env.SYNC_SERVICE_KEY;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    let initiatorEmail = '';
+
+    if (serviceKey && expectedKey && serviceKey === expectedKey) {
+      // Authorized as scheduled job
+      initiatorEmail = 'scheduled-job';
+      console.log('Sync triggered by service key (scheduled job)');
+    } else {
+      // Fallback to the existing supabase session-based auth flow
+      const supabase = await createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Check if user is admin (lookup by email)
+      const authUserEmail = user.email || '';
+      const userRole = await getUserRole(authUserEmail);
+      if (userRole !== 'admin') {
+        return NextResponse.json({ error: 'Access denied. Admin role required.' }, { status: 403 });
+      }
+
+      // Parse request body
+      const body = await request.json().catch(() => ({}));
+      const { userEmail } = body as { userEmail?: string };
+      initiatorEmail = userEmail || authUserEmail;
+
+      console.log(`Sync started by: ${initiatorEmail}`);
     }
-
-    // Check if user is admin (lookup by email)
-    const authUserEmail = user.email || '';
-    const userRole = await getUserRole(authUserEmail);
-    if (userRole !== 'admin') {
-      return NextResponse.json({ error: 'Access denied. Admin role required.' }, { status: 403 });
-    }
-
-    // Parse request body
-    const body = await request.json();
-  const { userEmail } = body;
-
-  console.log(`Sync started by: ${userEmail}`);
 
     // Set sync status to in-progress
-    await setLastUpdated('asana_sync', 'in-progress', 'Sync started');
+    await setLastUpdated('asana_sync', 'in-progress', `Sync started by ${initiatorEmail}`);
 
     try {
       // Fetch data from Asana
@@ -53,7 +66,7 @@ export async function POST(request: NextRequest) {
 
       if (result.success) {
         console.log(`Sync completed successfully. ${result.recordCount} records processed.`);
-        
+
         return NextResponse.json({
           success: true,
           message: `Sync completed successfully. Processed ${totalTasks} tasks and ${totalSubtasks} subtasks.`,
@@ -62,7 +75,7 @@ export async function POST(request: NextRequest) {
             key: 'asana_sync',
             lastUpdated: new Date().toISOString(),
             status: 'success',
-            message: `Sync completed by ${userEmail}`,
+            message: `Sync completed by ${initiatorEmail}`,
             recordCount: result.recordCount,
           },
         });
@@ -72,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     } catch (syncError) {
       console.error('Sync error:', syncError);
-      
+
       // Update sync status to error
       const errorMessage = syncError instanceof Error ? syncError.message : 'Unknown sync error';
       await setLastUpdated('asana_sync', 'error', errorMessage);
@@ -86,7 +99,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('API error:', error);
-    
+
     return NextResponse.json({
       success: false,
       error: 'Internal server error',

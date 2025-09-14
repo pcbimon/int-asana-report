@@ -1,0 +1,22 @@
+name: Scheduled Auto Sync
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # 02:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  call-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sync endpoint
+        env:
+          SYNC_URL: ${{ secrets.SYNC_URL }}
+          SYNC_SERVICE_KEY: ${{ secrets.SYNC_SERVICE_KEY }}
+        run: |
+          echo "Calling sync endpoint..."
+          curl -sS -X POST "$SYNC_URL" \
+            -H "Content-Type: application/json" \
+            -H "x-sync-service-key: $SYNC_SERVICE_KEY" \
+            -d '{"userEmail":"automation@your.org"}' \
+            --fail
