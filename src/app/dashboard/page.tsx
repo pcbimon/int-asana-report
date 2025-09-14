@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/server';
 import { notFound, redirect } from 'next/navigation';
-import { getUserAssignee, getLastUpdated } from '@/lib/storage';
+import { getUserAssignee, getLastUpdated, getUserRole } from '@/lib/storage';
 
 // Maximum allowed age for sync metadata before forcing a resync (ms)
 const SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 1 day
@@ -17,7 +17,8 @@ export default async function DashboardIndexPage() {
     // Check last sync time and redirect to /sync if it's older than 1 day
     try {
       const last = await getLastUpdated();
-      if (last && last.lastUpdated) {
+      const userRole = await getUserRole(user.email!);
+      if (last && last.lastUpdated && userRole === 'admin') {
         const lastDate = new Date(last.lastUpdated).getTime();
         const now = Date.now();
         if (isFinite(lastDate) && now - lastDate > SYNC_MAX_AGE_MS) {
@@ -34,7 +35,7 @@ export default async function DashboardIndexPage() {
 
     // Use user email to resolve the assignee gid (assignees.email)
     const userEmail = user.email || '';
-    // const userRole = await getUserRole(userEmail);
+    
     const userAssignee = await getUserAssignee(userEmail);
 
     if (userAssignee) {
