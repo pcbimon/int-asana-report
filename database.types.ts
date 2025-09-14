@@ -16,24 +16,24 @@ export type Database = {
     Tables: {
       assignee_department: {
         Row: {
-          assignee_gid: string
+          assignee_email: string
           departmentid: string
         }
         Insert: {
-          assignee_gid: string
+          assignee_email: string
           departmentid: string
         }
         Update: {
-          assignee_gid?: string
+          assignee_email?: string
           departmentid?: string
         }
         Relationships: [
           {
-            foreignKeyName: "assignee_department_assignee_gid_fkey"
-            columns: ["assignee_gid"]
+            foreignKeyName: "assignee_department_assignee_email_fkey"
+            columns: ["assignee_email"]
             isOneToOne: true
-            referencedRelation: "assignees"
-            referencedColumns: ["gid"]
+            referencedRelation: "assignee_userinfo"
+            referencedColumns: ["assignee_email"]
           },
           {
             foreignKeyName: "assignee_department_departmentid_fkey"
@@ -43,6 +43,27 @@ export type Database = {
             referencedColumns: ["departmentid"]
           },
         ]
+      }
+      assignee_userinfo: {
+        Row: {
+          assignee_email: string
+          firstname: string
+          lastname: string | null
+          nickname: string | null
+        }
+        Insert: {
+          assignee_email: string
+          firstname: string
+          lastname?: string | null
+          nickname?: string | null
+        }
+        Update: {
+          assignee_email?: string
+          firstname?: string
+          lastname?: string | null
+          nickname?: string | null
+        }
+        Relationships: []
       }
       assignees: {
         Row: {
@@ -271,15 +292,15 @@ export type Database = {
       user_roles: {
         Row: {
           role: string | null
-          uid: string
+          user_email: string
         }
         Insert: {
           role?: string | null
-          uid: string
+          user_email: string
         }
         Update: {
           role?: string | null
-          uid?: string
+          user_email?: string
         }
         Relationships: []
       }
