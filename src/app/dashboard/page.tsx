@@ -32,13 +32,16 @@ export default async function DashboardIndexPage() {
       console.error('Failed to check sync metadata:', e);
     }
 
-    // const userRole = await getUserRole(user.id);
-    const userAssignee = await getUserAssignee(user.id);
+    // Use user email to resolve the assignee gid (assignees.email)
+    const userEmail = user.email || '';
+    // const userRole = await getUserRole(userEmail);
+    const userAssignee = await getUserAssignee(userEmail);
 
     if (userAssignee) {
       // Redirect to user's assignee dashboard
       redirect(`/dashboard/${encodeURIComponent(userAssignee)}`);
     } else {
+      // If no mapping was found, deny access
       redirect('/error?code=403');
     }
   } catch (error) {

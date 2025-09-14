@@ -54,8 +54,8 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   // Check if user has access to this assignee (role lookup by email)
   const userEmail = user.email || '';
   const userRole = await getUserRole(userEmail);
-  // user_assignees mapping still uses uid (auth user id)
-  const userAssignee = await getUserAssignee(user.id);
+  // Resolve assignee by the user's email address (assignees.email)
+  const userAssignee = await getUserAssignee(userEmail);
 
     if (userRole !== 'admin' && userAssignee !== assigneeGid) {
       notFound();

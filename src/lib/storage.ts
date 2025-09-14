@@ -607,24 +607,33 @@ export async function getUserRole(userEmail: string): Promise<string | null> {
 }
 
 /**
- * Get assignee associated with user
+ * Get assignee GID associated with a user email.
+ *
+ * Previously this used a `user_assignees` mapping keyed by auth `uid`.
+ * To simplify access checks we now resolve an assignee by matching the
+ * `assignees.email` column. If no matching assignee is found, `null` is
+ * returned.
  */
-export async function getUserAssignee(uid: string): Promise<string | null> {
+export async function getUserAssignee(userEmail: string): Promise<string | null> {
   try {
+    if (!userEmail) return null;
+
+    // Look up the assignee by email in the `assignees` table
     const { data, error } = await getSupabaseClient()
-      .from('user_assignees')
-      .select('assignee_gid')
-      .eq('uid', uid)
+      .from('assignees')
+      .select('gid')
+      .eq('email', userEmail)
       .single();
 
+    // PGRST116 = no rows returned
     if (error && error.code !== 'PGRST116') {
-      throw new Error(`Failed to get user assignee: ${error.message}`);
+      throw new Error(`Failed to get user assignee by email: ${error.message}`);
     }
 
-    return (data)?.assignee_gid || null;
+    return (data)?.gid || null;
 
   } catch (error) {
-    console.error('Error getting user assignee:', error);
+    console.error('Error getting user assignee by email:', error);
     return null;
   }
 }
