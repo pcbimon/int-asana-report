@@ -15,6 +15,7 @@ const isNextRedirect = (err: unknown) => {
 };
 
 // NOTE: Ensure this file is a Server Component (REMOVE any "use client" at the top).
+export const dynamic = 'force-dynamic';
 export default async function DashboardIndexPage() {
   try {
 

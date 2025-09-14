@@ -29,6 +29,9 @@ function SyncSkeleton() {
   );
 }
 
+// This page uses server-side cookies via `createClient()`; mark as dynamic
+export const dynamic = 'force-dynamic';
+
 export default async function SyncPage() {
   try {
     const supabase = await createClient();

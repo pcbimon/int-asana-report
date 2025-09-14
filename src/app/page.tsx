@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/server';
 import { redirect } from 'next/navigation';
 
+// This route needs to access cookies via `createClient()` so mark it dynamic
+export const dynamic = 'force-dynamic';
+
 export default async function RootPage() {
   // Attempt to get the current user; any thrown NEXT_REDIRECT from `redirect()` must not be caught here
   let user = null;

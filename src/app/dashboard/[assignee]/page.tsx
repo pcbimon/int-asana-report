@@ -13,6 +13,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { Assignee } from '@/models/asanaReport';
 
+// This page uses server-side cookies via `createClient()`; mark as dynamic
+export const dynamic = 'force-dynamic';
+
 interface DashboardPageProps {
   params: { assignee: string };
   searchParams: { [key: string]: string | string[] | undefined };
