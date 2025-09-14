@@ -347,17 +347,6 @@ export async function loadReport(assigneeGid?: string): Promise<AsanaReport> {
     console.log("Starting loadReport operation...");
     const startTime = Date.now();
 
-    // Load sections with nested tasks and subtasks (single query)
-    // We use PostgREST nested selects to fetch tasks and subtasks and include assignee references
-    // Note: aliasing used to avoid name collisions: task_assignee and subtask_assignee
-    // Projection: select only required columns to reduce payload size
-    // sections: gid, name
-    // tasks: gid, name, section_gid, assignee_gid, completed, completed_at, due_on, project, created_at
-    // task assignee: gid, name, email
-    // subtasks: gid, name, parent_task_gid, assignee_gid, completed, created_at, completed_at
-    // subtask assignee: gid, name, email
-    // Build select string. When filtering by assignee, we still request the same
-    // projection but we'll add a filter clause below to limit subtasks by assignee_gid.
     const selectString = `
     gid,name,
     tasks(
@@ -373,108 +362,173 @@ export async function loadReport(assigneeGid?: string): Promise<AsanaReport> {
       )
     )`;
 
-    // Execute query. If an assigneeGid is provided, add a PostgREST filter to the
-    // nested `subtasks` relationship: tasks.subtasks.assignee_gid=eq.{assigneeGid}
-    // PostgREST supports filtering on relationships by appending the path in the
-    // query string; with supabase-js we can use the `select` string and then
-    // call `.filter` on the client. However, the simpler approach is to use a
-    // raw RPC-like query via the view: we'll attach the filter using the
-    // PostgREST `select` with embedded filter syntax for the nested relation.
+    // Define typed shapes for the two response modes
+    type RpcRow = {
+      subtask_gid: string;
+      subtask_name?: string | null;
+      parent_task_gid?: string | null;
+      task_gid?: string | null;
+      task_name?: string | null;
+      section_gid?: string | null;
+      section_name?: string | null;
+      subtask_assignee_gid?: string | null;
+      subtask_assignee_name?: string | null;
+      subtask_assignee_email?: string | null;
+      followers?: unknown;
+      completed?: boolean;
+      created_at?: string | null;
+      completed_at?: string | null;
+      due_on?: string | null;
+    };
 
-    // Build the final select with an inline filter on subtasks when needed.
-    const finalSelect = selectString;
+    interface FollowerRaw { assignee_gid?: string | null; assignee?: AssigneeRow | null }
+    interface SubtaskRaw {
+      gid: string;
+      name: string;
+      parent_task_gid?: string | null;
+      assignee_gid?: string | null;
+      completed?: boolean;
+      created_at?: string | null;
+      completed_at?: string | null;
+      due_on?: string | null;
+      assignee?: AssigneeRow | null;
+      followers?: FollowerRaw[];
+    }
+    interface TaskRaw {
+      gid: string;
+      name: string;
+      section_gid?: string | null;
+      assignee_gid?: string | null;
+      completed?: boolean;
+      completed_at?: string | null;
+      due_on?: string | null;
+      project?: string | null;
+      created_at?: string | null;
+      assignee?: AssigneeRow | null;
+      subtasks?: SubtaskRaw[];
+    }
+    interface SectionNestedRow { gid: string; name: string | null; tasks?: TaskRaw[] }
 
-    const { data: nestedSections, error: nestedError } = await getSupabaseClient()
-      .from('sections')
-      .select(finalSelect);
+    let nestedSections: RpcRow[] | SectionNestedRow[] | null = null;
+    let nestedError: unknown = null;
+
+    const parseFollowerAssignee = (f: unknown): Assignee | null => {
+      if (!f || typeof f !== 'object') return null;
+      const o = f as FollowerRaw;
+      if (o.assignee) return rowToAssignee(o.assignee as AssigneeRow);
+      if (o.assignee_gid) return { gid: o.assignee_gid, name: o.assignee_gid, email: undefined };
+      return null;
+    };
+
+    if (assigneeGid) {
+      // RPC row shape (informal) — we'll cast the rpc result to this shape
+      type RpcRow = {
+        subtask_gid: string;
+        subtask_name?: string | null;
+        parent_task_gid?: string | null;
+        task_gid?: string | null;
+        task_name?: string | null;
+        section_gid?: string | null;
+        section_name?: string | null;
+        subtask_assignee_gid?: string | null;
+        subtask_assignee_name?: string | null;
+        subtask_assignee_email?: string | null;
+        followers?: unknown;
+        completed?: boolean;
+        created_at?: string | null;
+        completed_at?: string | null;
+        due_on?: string | null;
+      };
+
+      type RpcClient = { rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error?: unknown }> };
+      const rpcRes = await (getSupabaseClient() as unknown as RpcClient).rpc('get_subtasks_by_assignee', { p_assignee_gid: assigneeGid });
+      nestedSections = rpcRes?.data as RpcRow[] | null;
+      nestedError = rpcRes?.error;
+    } else {
+      const res = await getSupabaseClient().from('sections').select(selectString);
+      nestedSections = res.data as SectionNestedRow[] | null;
+      nestedError = res.error;
+    }
 
     if (nestedError) {
-      throw new Error(`Failed to load nested sections: ${nestedError.message}`);
+      const errObj = nestedError as { message?: unknown } | null;
+      const errMsg = errObj && typeof errObj.message === 'string' ? errObj.message : String(nestedError);
+      throw new Error(`Failed to load nested sections: ${errMsg}`);
     }
-
-    if (!nestedSections) {
-      console.log("No sections found in database.");
-      return new AsanaReport([]);
-    }
+    if (!nestedSections) return new AsanaReport([]);
 
     // Map nested result into models
-    const sections: Section[] = (nestedSections).map((sectionRow) => {
-      const section = rowToSection({
-        gid: sectionRow.gid,
-        name: sectionRow.name,
-      } as SectionRow);
+    let sections: Section[] = [];
+    if (assigneeGid) {
+      // Materialize sections/tasks/subtasks from flat RPC rows
+      const rows = nestedSections as RpcRow[];
+      const sectionMap = new Map<string, Section>();
+      const taskMap = new Map<string, Task>();
 
-      const tasksRaw = sectionRow.tasks || [];
-      section.tasks = tasksRaw.map((t) => {
-        // t.assignee may be null or an array depending on PostgREST; normalize
-        const taskAssigneeRow = t.assignee_gid != null ? t.assignee : null;
-        const taskAssignee = taskAssigneeRow
-          ? rowToAssignee(taskAssigneeRow as AssigneeRow)
-          : undefined;
+      for (const r of rows) {
+        const secGid = r.section_gid || '__no_section__';
+        if (!sectionMap.has(secGid)) {
+          sectionMap.set(secGid, rowToSection({ gid: secGid, name: r.section_name || 'No Section' } as SectionRow));
+        }
+        const section = sectionMap.get(secGid)!;
 
-        const task: Task = rowToTask(
-          {
-            gid: t.gid,
-            name: t.name,
-            section_gid: t.section_gid,
-            assignee_gid: taskAssignee ? taskAssignee.gid : null,
-            completed: t.completed,
-            completed_at: t.completed_at || null,
-            due_on: t.due_on || null,
-            project: t.project || null,
-            created_at: t.created_at || null,
-          } as TaskRow,
-          taskAssignee
-        );
-
-        let subtasksRaw = t.subtasks || [];
-        // If an assigneeGid was supplied, filter subtasks server-side result
-        // to only include those assigned to the given assignee. We perform
-        // this filtering here to avoid returning unrelated rows.
-        if (assigneeGid) {
-          // Include subtasks where the provided assigneeGid is either the subtask assignee
-          // or is present in the followers list (follower-only subtasks should be visible)
-          subtasksRaw = subtasksRaw.filter((s) => {
-            if (s.assignee_gid === assigneeGid) return true;
-            const followers = s.followers || [];
-            return followers.some((f) => f && f.assignee_gid === assigneeGid);
-          });
+        const taskGid = r.task_gid || (`__task_for_${r.parent_task_gid || r.subtask_gid}`);
+        let task = taskMap.get(taskGid);
+        if (!task) {
+          task = rowToTask({ gid: taskGid, name: r.task_name || 'No Task', section_gid: secGid, assignee_gid: null, completed: false, completed_at: null, due_on: null, project: null, created_at: null } as TaskRow, undefined);
+          taskMap.set(taskGid, task);
+          section.tasks.push(task);
         }
 
-        task.subtasks = subtasksRaw.map((s) => {
-          const subAssigneeRow = s.assignee_gid != null ? s.assignee : null;
-          const subAssignee = subAssigneeRow
-            ? rowToAssignee(subAssigneeRow as AssigneeRow)
-            : undefined;
-          const followersRaw = s.followers || [];
+        const subAssignee = r.subtask_assignee_gid ? rowToAssignee({ gid: r.subtask_assignee_gid, name: r.subtask_assignee_name || null, email: r.subtask_assignee_email || null } as AssigneeRow) : undefined;
+        const followersRaw = Array.isArray(r.followers) ? (r.followers as unknown[]) : [];
+        const followers = followersRaw.map(parseFollowerAssignee).filter((x): x is Assignee => x !== null);
 
-          return rowToSubtask(
-            {
-              gid: s.gid,
-              name: s.name,
-              parent_task_gid: s.parent_task_gid,
-              assignee_gid: subAssignee ? subAssignee.gid : null,
-              completed: s.completed,
-              created_at: s.created_at || null,
-              completed_at: s.completed_at || null,
-              due_on: s.due_on || null,
-            } as SubtaskRow,
-            subAssignee,
-            followersRaw.map((f) => rowToAssignee(f.assignee as AssigneeRow))
-          );
-        });
+        const subtask = rowToSubtask({ gid: r.subtask_gid, name: r.subtask_name || '', parent_task_gid: r.parent_task_gid || task.gid, assignee_gid: r.subtask_assignee_gid || null, completed: r.completed || false, created_at: r.created_at || null, completed_at: r.completed_at || null, due_on: r.due_on || null } as SubtaskRow, subAssignee, followers);
+        task.subtasks = task.subtasks || [];
+        task.subtasks.push(subtask);
+      }
 
-        return task;
-      })
-        // If assigneeGid was provided, drop tasks that have no subtasks for that assignee
-        .filter((task: Task) => {
-          if (!assigneeGid) return true;
-          return (task.subtasks && task.subtasks.length > 0) || false;
-        });
+      sections = Array.from(sectionMap.values());
+    } else {
+      // Map the nested sections result returned by PostgREST
+      const nested = (nestedSections || []) as SectionNestedRow[];
+      sections = nested.map((sectionRow) => {
+        const section = rowToSection({ gid: sectionRow.gid, name: sectionRow.name } as SectionRow);
+        const tasksRaw = sectionRow.tasks || [] as TaskRaw[];
+        section.tasks = tasksRaw.map((t: TaskRaw) => {
+          const taskAssigneeRow = t.assignee_gid != null ? t.assignee : null;
+          const taskAssignee = taskAssigneeRow ? rowToAssignee(taskAssigneeRow as AssigneeRow) : undefined;
+          const task = rowToTask({ gid: t.gid, name: t.name, section_gid: t.section_gid || '', assignee_gid: taskAssignee ? taskAssignee.gid : null, completed: !!t.completed, completed_at: t.completed_at || null, due_on: t.due_on || null, project: t.project || null, created_at: t.created_at || null } as TaskRow, taskAssignee);
 
-      return section;
-    });
-    // If filtering by assignee, drop sections that have no tasks for that assignee
+          let subtasksRaw = t.subtasks || [] as SubtaskRaw[];
+          if (assigneeGid) {
+            subtasksRaw = subtasksRaw.filter((s: SubtaskRaw) => {
+              if (s.assignee_gid === assigneeGid) return true;
+              const followers = s.followers || [];
+              return followers.some((f) => !!f && f.assignee_gid === assigneeGid);
+            });
+          }
+
+          task.subtasks = subtasksRaw.map((s: SubtaskRaw) => {
+            const subAssigneeRow = s.assignee_gid != null ? s.assignee : null;
+            const subAssignee = subAssigneeRow ? rowToAssignee(subAssigneeRow as AssigneeRow) : undefined;
+            const followersRaw = s.followers || [];
+            const followers = followersRaw.map(parseFollowerAssignee).filter((x): x is Assignee => x !== null);
+            return rowToSubtask({ gid: s.gid, name: s.name, parent_task_gid: s.parent_task_gid || '', assignee_gid: subAssignee ? subAssignee.gid : null, completed: !!s.completed, created_at: s.created_at || null, completed_at: s.completed_at || null, due_on: s.due_on || null } as SubtaskRow, subAssignee, followers);
+          });
+
+          return task;
+        })
+          .filter((task: Task) => {
+            if (!assigneeGid) return true;
+            return !!(task.subtasks && task.subtasks.length > 0);
+          });
+
+        return section;
+      });
+    }
+
     const filteredSections = assigneeGid ? sections.filter(sec => (sec.tasks && sec.tasks.length > 0)) : sections;
 
     const duration = Date.now() - startTime;
@@ -801,3 +855,4 @@ export async function getDepartmentsWithAssignees(): Promise<{ departmentId: str
     return [];
   }
 }
+
