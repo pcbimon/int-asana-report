@@ -29,6 +29,8 @@ dayjs.extend(relativeTime);
 interface SyncClientProps {
   lastSync: SyncMetadata | null;
   userEmail: string;
+  // when true, forces a sync (parent can toggle to trigger)
+  forceSyncTrigger?: boolean;
 }
 
 interface SyncProgress {
@@ -39,15 +41,14 @@ interface SyncProgress {
   hasError: boolean;
 }
 
-export function SyncClient({ lastSync, userEmail }: SyncClientProps) {
+export function SyncClient({ lastSync, userEmail, forceSyncTrigger }: SyncClientProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [, setSyncProgress] = useState<SyncProgress[]>([]);
   const [currentSync, setCurrentSync] = useState<SyncMetadata | null>(lastSync);
   const [error, setError] = useState<string | null>(null);
-  const autoTriggeredRef = useRef(false);
+  // track whether we've triggered due to a force request
+  const forceTriggeredRef = useRef<boolean>(false);
 
-// ms threshold for auto-sync: 1 day
-const SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const router = useRouter();
   
   const handleSync = useCallback(async () => {
@@ -86,34 +87,26 @@ const SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   // When an auto-triggered sync completes successfully, navigate to the dashboard
   useEffect(() => {
     try {
-      if (autoTriggeredRef.current && currentSync?.status === 'success') {
+      // if we previously triggered via the force trigger and the current sync
+      // completed successfully, redirect.
+      if (forceTriggeredRef.current && currentSync?.status === 'success') {
         router.push('/dashboard');
       }
     } catch (err) {
-      console.error('Failed to redirect after auto-sync:', err);
+      console.error('Failed to redirect after forced sync:', err);
     }
   }, [currentSync, router]);
 
   useEffect(() => {
-    // Auto-trigger sync when opening the page if last sync is more than 1 day old
-    // Only run once per component mount (guarded by autoTriggeredRef)
+    // Trigger sync when `forceSync` prop becomes true. This is a one-time trigger per mount
+    // to mirror the previous behavior but explicit via prop.
     try {
-      if (!autoTriggeredRef.current && !isLoading && currentSync && currentSync.lastUpdated) {
-        const lastTime = new Date(currentSync.lastUpdated).getTime();
-        if (isFinite(lastTime) && Date.now() - lastTime > SYNC_MAX_AGE_MS) {
-          // Don't trigger if the last sync is already marked in-progress
-          if (currentSync.status !== 'in-progress') {
-            autoTriggeredRef.current = true;
-            // handleSync is stable (see useCallback below)
-            handleSync();
-          }
-        }
-      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     } catch (err) {
-      console.error('Failed during auto-sync check:', err);
+      console.error('Unexpected error in forceSync effect setup:', err);
     }
 
-    let pollInterval: NodeJS.Timeout;
+    let pollInterval: NodeJS.Timeout | undefined;
 
     if (isLoading) {
       pollInterval = setInterval(async () => {
@@ -138,7 +131,22 @@ const SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
     return () => {
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [isLoading, currentSync, handleSync, SYNC_MAX_AGE_MS]);
+  }, [isLoading, handleSync]);
+
+  // Effect: watch for forceSync prop (optional) and trigger a sync when it becomes true
+  useEffect(() => {
+    try {
+      // If parent sets `forceSyncTrigger` to true and we haven't already
+      // triggered for that request, start a sync. Parent can set it to
+      // false and then true again (or remount) to retrigger.
+      if (forceSyncTrigger && !forceTriggeredRef.current && !isLoading) {
+        forceTriggeredRef.current = true;
+        handleSync();
+      }
+    } catch (err) {
+      console.error('Failed to trigger forced sync via trigger token:', err);
+    }
+  }, [forceSyncTrigger, isLoading, handleSync]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {

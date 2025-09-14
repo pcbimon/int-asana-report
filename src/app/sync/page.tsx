@@ -32,7 +32,7 @@ function SyncSkeleton() {
 // This page uses server-side cookies via `createClient()`; mark as dynamic
 export const dynamic = 'force-dynamic';
 
-export default async function SyncPage() {
+export default async function SyncPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -64,9 +64,11 @@ export default async function SyncPage() {
 
     const lastSync = await getLastUpdated();
 
+    const force = typeof searchParams?.force === 'string' && searchParams.force === 'true';
+
     return (
       <Suspense fallback={<SyncSkeleton />}>
-        <SyncClient lastSync={lastSync} userEmail={user.email || ''} />
+        <SyncClient lastSync={lastSync} userEmail={user.email || ''} forceSyncTrigger={force} />
       </Suspense>
     );
 
