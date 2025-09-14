@@ -5,9 +5,19 @@ import { getUserAssignee, getLastUpdated, getUserRole } from '@/lib/storage';
 // Maximum allowed age for sync metadata before forcing a resync (ms)
 const SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 1 day
 
+// Helper to detect Next.js control-flow redirect errors so we can rethrow them
+const isNextRedirect = (err: unknown) => {
+  const e = err as { message?: unknown; digest?: unknown } | undefined;
+  return (
+    (typeof e?.message === 'string' && e.message.includes('NEXT_REDIRECT')) ||
+    (typeof e?.digest === 'string' && String(e.digest).startsWith('NEXT_REDIRECT'))
+  );
+};
+
 // NOTE: Ensure this file is a Server Component (REMOVE any "use client" at the top).
 export default async function DashboardIndexPage() {
   try {
+
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -29,7 +39,9 @@ export default async function DashboardIndexPage() {
         }
       }
     } catch (e) {
-      // If checking sync metadata fails, log and continue to avoid blocking access
+      // If the caught error is a Next.js redirect control-flow exception, rethrow
+      if (isNextRedirect(e)) throw e;
+      // Otherwise log and continue to avoid blocking access from sync metadata failures
       console.error('Failed to check sync metadata:', e);
     }
 
@@ -49,12 +61,7 @@ export default async function DashboardIndexPage() {
     // Next.js uses a thrown control-flow exception for `redirect()` with a digest
     // starting with 'NEXT_REDIRECT'. We must rethrow those so Next can handle
     // the redirect instead of treating it as an application error.
-    const e = error as { message?: unknown; digest?: unknown };
-    const isNextRedirect =
-      (typeof e?.message === 'string' && e.message.includes('NEXT_REDIRECT')) ||
-      (typeof e?.digest === 'string' && e.digest.startsWith('NEXT_REDIRECT'));
-
-    if (isNextRedirect) throw error;
+    if (isNextRedirect(error)) throw error;
 
     console.error('Error loading dashboard index:', error);
     notFound();
