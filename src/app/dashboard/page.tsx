@@ -35,7 +35,14 @@ export default async function DashboardIndexPage() {
           // Force user to trigger/see the sync page
           redirect('/sync');
         } else {
-          redirect('/dashboard');
+          const userAssignee = await getUserAssignee(user.email || '');
+          if (userAssignee) {
+            // Redirect to user's assignee dashboard
+            redirect(`/dashboard/${encodeURIComponent(userAssignee)}`);
+          } else {
+            // If no mapping was found, deny access
+            redirect('/error?code=403');
+          }
         }
       }
     } catch (e) {
