@@ -162,100 +162,106 @@ export function DashboardClient({
       <div id="dashboard-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Header assignee={assignee} onExportPDF={handleExportPDF} onExportExcel={handleExportExcel} />
 
-        <div className="flex items-center justify-between py-4">
-          <div className="flex items-center space-x-4">
-            <Badge variant={userRole === 'admin' ? 'default' : 'secondary'}>
-              {userRole === 'admin' ? (
-                <>
-                  <Users className="w-3 h-3 mr-1" />
-                  Admin
-                </>
-              ) : (
-                'User'
+        <div className="py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between sm:flex-nowrap gap-3">
+            {/* Left: badge + controls */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <Badge className="hidden sm:inline-flex" variant={userRole === 'admin' ? 'default' : 'secondary'}>
+                {userRole === 'admin' ? (
+                  <>
+                    <Users className="w-3 h-3 mr-1" />
+                    Admin
+                  </>
+                ) : (
+                  'User'
+                )}
+              </Badge>
+
+              {isAdmin && availableAssignees.length > 0 && (
+                <div className="min-w-0">
+                  <label className="sr-only">Select assignee</label>
+                  <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" aria-expanded={assigneePopoverOpen} className="w-[220px] max-w-full truncate justify-between" size="sm">
+                        {assignee ? `${currentAssigneeDisplay}` : 'Select assignee...'}
+                        <ChevronsUpDown className="opacity-50 ml-2" />
+                      </Button>
+                    </PopoverTrigger>
+
+                    <PopoverContent className="p-0">
+                      <Command>
+                        <CommandInput placeholder="Search assignee..." className="h-9" />
+                        <CommandList>
+                          <CommandEmpty>No assignee found.</CommandEmpty>
+                          {/* Prefer grouping from availableDepartments if provided */}
+                          {availableDepartments && availableDepartments.length > 0 ? (
+                            availableDepartments.map((dept) => (
+                              <CommandGroup key={dept.departmentId} heading={dept.name_en}>
+                                {(dept.assignee || []).map(a => {
+                                  const rawName = a.name ?? '';
+                                  let firstname = '';
+                                  let nickname = '';
+                                  const nickMatch = rawName.match(/^([^(]+)\(([^)]+)\)$/);
+                                  if (nickMatch) {
+                                    firstname = nickMatch[1].trim();
+                                    nickname = nickMatch[2].trim();
+                                  } else {
+                                    firstname = rawName;
+                                  }
+
+                                  const searchValue = `${a.gid} ${a.email ?? ''} ${firstname} ${nickname}`.trim();
+
+                                  return (
+                                    <CommandItem
+                                      key={a.gid}
+                                      value={searchValue}
+                                      onSelect={() => {
+                                        setAssigneePopoverOpen(false);
+                                        router.push(`/dashboard/${a.gid}`);
+                                      }}
+                                      className="flex items-center gap-2"
+                                    >
+                                      <span className="truncate">{a.name ?? a.email}</span>
+                                      <Check className={assignee.gid === a.gid ? 'ml-auto opacity-100' : 'ml-auto opacity-0'} />
+                                    </CommandItem>
+                                  );
+                                })}
+                              </CommandGroup>
+                            ))
+                          ) : null}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               )}
-            </Badge>
 
-            {isAdmin && availableAssignees.length > 0 && (
-              <div className="flex items-center">
-                <label className="sr-only">Select assignee</label>
-                <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" aria-expanded={assigneePopoverOpen} className="w-[220px] justify-between" size="sm">
-                      {assignee ? `${currentAssigneeDisplay}` : 'Select assignee...'}
-                      <ChevronsUpDown className="opacity-50 ml-2" />
+              {/* Hide lastSync on very small screens to save space */}
+              {lastSyncTime && (
+                <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-600">
+                  <RefreshCw className="w-3 h-3" />
+                  <span className="truncate">Last synced: {new Date(lastSyncTime).toLocaleString()}</span>
+                </div>
+              )}
+
+              {isAdmin && (
+                  <div className="ml-auto flex items-center space-x-2 sm:shrink-0">
+                    <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={() => window.location.href = '/sync'}>
+                      <Settings className="w-4 h-4 mr-1" />
+                      Sync Data
                     </Button>
-                  </PopoverTrigger>
+                    <Button variant="outline" size="sm" className="sm:hidden" onClick={() => window.location.href = '/sync'}>
+                      <Settings className="w-4 h-4" />
+                    </Button>
 
-                  <PopoverContent className="p-0">
-                    <Command>
-                      <CommandInput placeholder="Search assignee..." className="h-9" />
-                      <CommandList>
-                        <CommandEmpty>No assignee found.</CommandEmpty>
-                        {/* Prefer grouping from availableDepartments if provided */}
-                        {availableDepartments && availableDepartments.length > 0 ? (
-                          availableDepartments.map((dept) => (
-                            <CommandGroup key={dept.departmentId} heading={dept.name_en}>
-                              {(dept.assignee || []).map(a => {
-                                // Attempt to extract firstname and nickname from a.name if in format "firstname(nickname)"
-                                const rawName = a.name ?? '';
-                                let firstname = '';
-                                let nickname = '';
-                                const nickMatch = rawName.match(/^([^(]+)\(([^)]+)\)$/);
-                                if (nickMatch) {
-                                  firstname = nickMatch[1].trim();
-                                  nickname = nickMatch[2].trim();
-                                } else {
-                                  firstname = rawName;
-                                }
-
-                                const searchValue = `${a.gid} ${a.email ?? ''} ${firstname} ${nickname}`.trim();
-
-                                return (
-                                  <CommandItem
-                                    key={a.gid}
-                                    value={searchValue}
-                                    onSelect={() => {
-                                      setAssigneePopoverOpen(false);
-                                      router.push(`/dashboard/${a.gid}`);
-                                    }}
-                                    className="flex items-center gap-2"
-                                  >
-                                    <span className="truncate">{a.name ?? a.email}</span>
-                                    <Check className={assignee.gid === a.gid ? 'ml-auto opacity-100' : 'ml-auto opacity-0'} />
-                                  </CommandItem>
-                                );
-                              })}
-                            </CommandGroup>
-                          ))
-                        ) : null}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                    <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isExporting}>
+                      <RefreshCw className="w-4 h-4 mr-1" />
+                      <span className="hidden sm:inline">Refresh</span>
+                    </Button>
+                  </div>
+                )}
               </div>
-            )}
-
-            {lastSyncTime && (
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <RefreshCw className="w-3 h-3" />
-                <span>Last synced: {new Date(lastSyncTime).toLocaleString()}</span>
-              </div>
-            )}
-
-            {isAdmin && (
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" onClick={() => window.location.href = '/sync'}>
-                  <Settings className="w-4 h-4 mr-1" />
-                  Sync Data
-                </Button>
-              </div>
-            )}
           </div>
-
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isExporting}>
-            <RefreshCw className="w-4 h-4 mr-1" />
-            Refresh
-          </Button>
         </div>
 
         <div className="space-y-8 pb-8">
