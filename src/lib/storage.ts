@@ -75,6 +75,11 @@ interface SyncMetadataRow {
   record_count: number | null;
 }
 
+interface DepartmentRow {
+  departmentid: string;
+  name_en?: string | null;
+}
+
 
 /**
  * Convert model objects to database rows
@@ -742,7 +747,8 @@ export async function clearAllData(): Promise<void> {
  */
 export async function getDepartmentsWithAssignees(): Promise<{ departmentId: string; name_en: string; assignee: Assignee[] }[]> {
   try {
-    // Safer approach: fetch departments and then map assignee_department -> assignee_userinfo + assignees
+    // Batch approach: fetch departments, all mappings for those departments,
+    // then fetch all referenced assignees and userinfo in two batched queries.
     const { data: deps, error: depsErr } = await getSupabaseClient()
       .from('departments')
       .select('*')
@@ -751,102 +757,102 @@ export async function getDepartmentsWithAssignees(): Promise<{ departmentId: str
     if (depsErr) {
       throw new Error(`Failed to load departments: ${depsErr.message}`);
     }
-    // // Fallback: if PostgREST nested select didn't return expected shape, run a raw join
-    // if (error || !data) {
-    //   // Use a safer approach: fetch departments then fetch mappings
-    //   const { data: deps, error: depsErr } = await getSupabaseClient().from('departments').select('*').order('departmentid');
-    //   if (depsErr) throw new Error(`Failed to load departments: ${depsErr.message}`);
 
-    //   const result: { departmentId: string; name_en: string; assignee: Assignee[] }[] = [];
-    //   for (const d of deps || []) {
-    //     const { data: mappingRows, error: mapErr } = await getSupabaseClient()
-    //       .from('assignee_department')
-    //       .select('assignee_gid')
-    //       .eq('departmentid', d.departmentid);
-    //     if (mapErr) throw new Error(`Failed to load mapping for ${d.departmentid}: ${mapErr.message}`);
+  const deptList = (deps || []) as DepartmentRow[];
+  if (deptList.length === 0) return [];
 
-    //     const assignees: Assignee[] = [];
-    //     for (const m of (mappingRows || [])) {
-    //       const { data: aRow, error: aErr } = await getSupabaseClient().from('assignees').select('*').eq('gid', m.assignee_gid).single();
-    //       if (!aErr && aRow) assignees.push(rowToAssignee({ gid: aRow.gid, email: aRow.email, name: aRow.name }));
-    //     }
+  const deptIds = deptList.map((d) => d.departmentid).filter(Boolean) as string[];
 
-    //     result.push({ departmentId: d.departmentid, name_en: d.name_en, assignee: assignees });
-    //   }
-    //   console.log('Used fallback method to load departments with assignees.');
-    //   return result;
-    // }
+    // Fetch all mappings for these departments in one call
+    const { data: allMappings, error: mappingsErr } = await getSupabaseClient()
+      .from('assignee_department')
+      .select('assignee_email, departmentid')
+      .in('departmentid', deptIds);
+
+    if (mappingsErr) {
+      throw new Error(`Failed to load assignee_department mappings: ${mappingsErr.message}`);
+    }
+
+  const mappingRows = (allMappings || []) as { assignee_email?: string; departmentid?: string }[];
+  const uniqueEmails = Array.from(new Set(mappingRows.map((m) => m.assignee_email).filter(Boolean))) as string[];
+
+    // Pre-fetch assignees and userinfo in bulk (if we have any emails)
+    let assigneesRows: AssigneeRow[] = [];
+    let infoRows: { assignee_email: string; firstname?: string; lastname?: string; nickname?: string }[] = [];
+
+    if (uniqueEmails.length > 0) {
+      const [{ data: aRows, error: aErr }, { data: iRows, error: iErr }] = await Promise.all([
+        getSupabaseClient()
+          .from('assignees')
+          .select('gid, name, email')
+          .in('email', uniqueEmails),
+        getSupabaseClient()
+          .from('assignee_userinfo')
+          .select('assignee_email, firstname, lastname, nickname')
+          .in('assignee_email', uniqueEmails),
+      ]);
+
+      if (!aRows && aErr) {
+        console.error('Failed to load assignees in batch:', aErr);
+      } else if (aRows) {
+        assigneesRows = aRows as AssigneeRow[];
+      }
+      if (!iRows && iErr) {
+        console.error('Failed to load assignee_userinfo in batch:', iErr);
+      } else if (iRows) {
+        infoRows = iRows as { assignee_email: string; firstname?: string; lastname?: string; nickname?: string }[];
+      }
+    }
+
+    // Build quick lookup maps by email
+    const assigneeByEmail = new Map<string, AssigneeRow>();
+    for (const a of assigneesRows) if (a.email) assigneeByEmail.set(a.email, a);
+
+  const infoByEmail = new Map<string, { assignee_email: string; firstname?: string; lastname?: string; nickname?: string }>();
+  for (const i of infoRows) if (i.assignee_email) infoByEmail.set(i.assignee_email, i);
+
+    // Group mapping emails by department
+    const emailsByDept = new Map<string, string[]>();
+    for (const m of mappingRows) {
+      if (!m || !m.departmentid) continue;
+      const email = m.assignee_email;
+      if (!email) continue;
+      if (!emailsByDept.has(m.departmentid)) emailsByDept.set(m.departmentid, []);
+      emailsByDept.get(m.departmentid)!.push(email);
+    }
 
     const out: { departmentId: string; name_en: string; assignee: Assignee[] }[] = [];
 
-    // For each department, find mapping rows from assignee_department
-    for (const d of deps || []) {
-      const { data: mappings, error: mapErr } = await getSupabaseClient()
-        .from('assignee_department')
-        .select('assignee_email, departmentid')
-        .eq('departmentid', d.departmentid);
-
-      if (mapErr) {
-        console.error(`Failed to load assignee_department for ${d.departmentid}:`, mapErr);
-        continue;
-      }
-
-      const assignees: Assignee[] = [];
-
-      for (const m of mappings || []) {
-        const assigneeEmail = m.assignee_email;
-        if (!assigneeEmail) continue;
-
-        // Lookup assignees table to get gid (link between asana-assignee gid and email)
-        const { data: aRow, error: aErr } = await getSupabaseClient()
-          .from('assignees')
-          .select('gid, name, email')
-          .eq('email', assigneeEmail)
-          .limit(1)
-          .maybeSingle();
-
-        if (aErr) {
-          console.error(`Failed to lookup assignee by email ${assigneeEmail}:`, aErr);
-          continue;
-        }
-
-        // Lookup assignee_userinfo for firstname/nickname
-        const { data: infoRow, error: infoErr } = await getSupabaseClient()
-          .from('assignee_userinfo')
-          .select('assignee_email, firstname, lastname, nickname')
-          .eq('assignee_email', assigneeEmail)
-          .limit(1)
-          .maybeSingle();
-
-        if (infoErr) {
-          console.error(`Failed to lookup assignee_userinfo for ${assigneeEmail}:`, infoErr);
-        }
+    for (const d of deptList) {
+      const emails = emailsByDept.get(d.departmentid) || [];
+      const assignees: Assignee[] = emails.map((assigneeEmail: string) => {
+        const aRow = assigneeByEmail.get(assigneeEmail);
+        const info = infoByEmail.get(assigneeEmail);
 
         // Build display name as "firstname(nickname)" when available
         let displayName = '';
-        if (infoRow && infoRow.firstname) {
-          displayName = infoRow.firstname;
-          if (infoRow.nickname) displayName += `(${infoRow.nickname})`;
+        if (info && info.firstname) {
+          displayName = info.firstname;
+          if (info.nickname) displayName += `(${info.nickname})`;
         }
 
         if (aRow && aRow.gid) {
-          assignees.push({
+          return {
             gid: aRow.gid,
             name: displayName || (aRow.name || aRow.email || aRow.gid),
             email: aRow.email || undefined,
-          });
-        } else {
-          // If there's no mapping to `assignees` table, we can still include a placeholder
-          // using the email as the gid so the UI can still navigate to a dashboard if desired.
-          assignees.push({
-            gid: assigneeEmail,
-            name: displayName || assigneeEmail.split('@')[0],
-            email: assigneeEmail,
-          });
+          } as Assignee;
         }
-      }
 
-      out.push({ departmentId: d.departmentid, name_en: d.name_en, assignee: assignees });
+        // Fallback placeholder when there's no `assignees` row
+        return {
+          gid: assigneeEmail,
+          name: displayName || assigneeEmail.split('@')[0],
+          email: assigneeEmail,
+        } as Assignee;
+      });
+
+  out.push({ departmentId: d.departmentid, name_en: d.name_en || '', assignee: assignees });
     }
 
     return out;

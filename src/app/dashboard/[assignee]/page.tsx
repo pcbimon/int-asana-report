@@ -198,6 +198,7 @@ async function DashboardContent({ assigneeGid, userRole }: { assigneeGid: string
   if (userRole === 'admin') {
     try {
       availableAssignees = await getAllAssigneesFromDB();
+      console.log('Loading all available assignees');
     } catch (e) {
       console.error('Failed to load available assignees:', e);
       availableAssignees = [];
@@ -212,11 +213,13 @@ async function DashboardContent({ assigneeGid, userRole }: { assigneeGid: string
   if (userRole === 'admin') {
     try {
       availableDepartments = await getDepartmentsWithAssignees();
+      console.log('Loading departments with assignees');
       // custom sort departments ID by listed order
       const departmentOrder = ['EX','TC','RA','EE','AD','SC'];
       availableDepartments.sort((a, b) => {
         return departmentOrder.indexOf(a.departmentId) - departmentOrder.indexOf(b.departmentId);
       });
+      console.log('Loaded departments with assignees');
     } catch (e) {
       console.error('Failed to load departments with assignees:', e);
       availableDepartments = [];
