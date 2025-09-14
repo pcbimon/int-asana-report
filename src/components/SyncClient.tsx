@@ -29,8 +29,6 @@ dayjs.extend(relativeTime);
 interface SyncClientProps {
   lastSync: SyncMetadata | null;
   userEmail: string;
-  // when true, forces a sync (parent can toggle to trigger)
-  forceSyncTrigger?: boolean;
 }
 
 interface SyncProgress {
@@ -41,7 +39,7 @@ interface SyncProgress {
   hasError: boolean;
 }
 
-export function SyncClient({ lastSync, userEmail, forceSyncTrigger }: SyncClientProps) {
+export function SyncClient({ lastSync, userEmail }: SyncClientProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [, setSyncProgress] = useState<SyncProgress[]>([]);
   const [currentSync, setCurrentSync] = useState<SyncMetadata | null>(lastSync);
@@ -133,20 +131,6 @@ export function SyncClient({ lastSync, userEmail, forceSyncTrigger }: SyncClient
     };
   }, [isLoading, handleSync]);
 
-  // Effect: watch for forceSync prop (optional) and trigger a sync when it becomes true
-  useEffect(() => {
-    try {
-      // If parent sets `forceSyncTrigger` to true and we haven't already
-      // triggered for that request, start a sync. Parent can set it to
-      // false and then true again (or remount) to retrigger.
-      if (forceSyncTrigger && !forceTriggeredRef.current && !isLoading) {
-        forceTriggeredRef.current = true;
-        handleSync();
-      }
-    } catch (err) {
-      console.error('Failed to trigger forced sync via trigger token:', err);
-    }
-  }, [forceSyncTrigger, isLoading, handleSync]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {

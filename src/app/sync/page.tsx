@@ -80,7 +80,7 @@ export default async function SyncPage({ searchParams }: { searchParams?: Search
 
     return (
       <Suspense fallback={<SyncSkeleton />}>
-        <SyncClient lastSync={lastSync} userEmail={user.email || ''} forceSyncTrigger={force} />
+        <SyncClient lastSync={lastSync} userEmail={user.email || ''} />
       </Suspense>
     );
 

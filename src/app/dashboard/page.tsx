@@ -29,31 +29,6 @@ export default async function DashboardIndexPage() {
     // Resolve user email once
     const userEmail = user.email || '';
 
-    // Check sync metadata + role, but keep logic simple:
-    // - If admin and last sync is too old => force /sync
-    // - Otherwise continue and redirect to the user's assignee dashboard (or 403)
-    let forceSync = false;
-    try {
-      const last = await getLastUpdated();
-      const role = await getUserRole(userEmail);
-      if (role === 'admin' && last?.lastUpdated) {
-        const lastDate = Date.parse(last.lastUpdated);
-        if (isFinite(lastDate) && Date.now() - lastDate > SYNC_MAX_AGE_MS) {
-          forceSync = true;
-        }
-      }
-    } catch (e) {
-      // Preserve Next.js redirect control-flow exceptions
-      if (isNextRedirect(e)) throw e;
-      // Log and continue if metadata/role check fails
-      console.error('Failed to check sync metadata or user role:', e);
-    }
-
-    if (forceSync) {
-      // Force admins to the sync page when data is stale
-      redirect('/sync?force=true');
-    }
-
     // Resolve assignee and redirect (same for admin and non-admin)
     const userAssignee = await getUserAssignee(userEmail);
     if (userAssignee) {
