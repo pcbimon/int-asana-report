@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getUserAssignee, getLastUpdated, getUserRole } from '@/lib/storage';
 
 // Maximum allowed age for sync metadata before forcing a resync (ms)
-const SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 1 day
+const SYNC_MAX_AGE_MS = 60 * 60 * 1000; // 1 day
 
 // Helper to detect Next.js control-flow redirect errors so we can rethrow them
 const isNextRedirect = (err: unknown) => {
@@ -26,43 +26,39 @@ export default async function DashboardIndexPage() {
     }
 
     // Check last sync time and redirect to /sync if it's older than 1 day
+    // Resolve user email once
+    const userEmail = user.email || '';
+
+    // Check sync metadata + role, but keep logic simple:
+    // - If admin and last sync is too old => force /sync
+    // - Otherwise continue and redirect to the user's assignee dashboard (or 403)
+    let forceSync = false;
     try {
       const last = await getLastUpdated();
-      const userRole = await getUserRole(user.email!);
-      if (last && last.lastUpdated && userRole === 'admin') {
-        const lastDate = new Date(last.lastUpdated).getTime();
-        const now = Date.now();
-        if (isFinite(lastDate) && now - lastDate > SYNC_MAX_AGE_MS) {
-          // Force user to trigger/see the sync page
-          redirect('/sync');
-        } else {
-          const userAssignee = await getUserAssignee(user.email || '');
-          if (userAssignee) {
-            // Redirect to user's assignee dashboard
-            redirect(`/dashboard/${encodeURIComponent(userAssignee)}`);
-          } else {
-            // If no mapping was found, deny access
-            redirect('/error?code=403');
-          }
+      const role = await getUserRole(userEmail);
+      if (role === 'admin' && last?.lastUpdated) {
+        const lastDate = Date.parse(last.lastUpdated);
+        if (isFinite(lastDate) && Date.now() - lastDate > SYNC_MAX_AGE_MS) {
+          forceSync = true;
         }
       }
     } catch (e) {
-      // If the caught error is a Next.js redirect control-flow exception, rethrow
+      // Preserve Next.js redirect control-flow exceptions
       if (isNextRedirect(e)) throw e;
-      // Otherwise log and continue to avoid blocking access from sync metadata failures
-      console.error('Failed to check sync metadata:', e);
+      // Log and continue if metadata/role check fails
+      console.error('Failed to check sync metadata or user role:', e);
     }
 
-    // Use user email to resolve the assignee gid (assignees.email)
-    const userEmail = user.email || '';
-    
-    const userAssignee = await getUserAssignee(userEmail);
+    if (forceSync) {
+      // Force admins to the sync page when data is stale
+      redirect('/sync?force=true');
+    }
 
+    // Resolve assignee and redirect (same for admin and non-admin)
+    const userAssignee = await getUserAssignee(userEmail);
     if (userAssignee) {
-      // Redirect to user's assignee dashboard
       redirect(`/dashboard/${encodeURIComponent(userAssignee)}`);
     } else {
-      // If no mapping was found, deny access
       redirect('/error?code=403');
     }
   } catch (error) {
