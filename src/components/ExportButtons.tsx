@@ -18,7 +18,7 @@ export function ExportButtons({ onExportPDF, onExportExcel, disabled = false }: 
         variant="outline"
         size="sm"
         onClick={onExportPDF}
-        disabled={disabled}
+        disabled={true}
         className="flex items-center space-x-2"
       >
         <FileText className="w-4 h-4" />
