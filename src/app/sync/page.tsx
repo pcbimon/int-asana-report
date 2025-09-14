@@ -32,7 +32,9 @@ function SyncSkeleton() {
 // This page uses server-side cookies via `createClient()`; mark as dynamic
 export const dynamic = 'force-dynamic';
 
-export default async function SyncPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
+type SearchParamsObj = { [key: string]: string | string[] | undefined };
+
+export default async function SyncPage({ searchParams }: { searchParams?: SearchParamsObj | Promise<SearchParamsObj> }) {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -62,9 +64,19 @@ export default async function SyncPage({ searchParams }: { searchParams?: { [key
       );
     }
 
-    const lastSync = await getLastUpdated();
+  const lastSync = await getLastUpdated();
 
-    const force = typeof searchParams?.force === 'string' && searchParams.force === 'true';
+  // searchParams may be a promise in Next.js; await it and provide a typed default
+  const params: SearchParamsObj = (await searchParams) ?? {};
+
+  // parse boolean-ish query param safely (supports string or string[])
+  const parseBooleanParam = (p: string | string[] | undefined) => {
+    if (typeof p === 'string') return p === 'true';
+    if (Array.isArray(p)) return p.includes('true');
+    return false;
+  };
+
+  const force = parseBooleanParam(params.force);
 
     return (
       <Suspense fallback={<SyncSkeleton />}>
