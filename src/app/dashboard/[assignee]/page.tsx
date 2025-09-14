@@ -51,9 +51,11 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
       redirect('/auth/login');
     }
 
-    // Check if user has access to this assignee
-    const userRole = await getUserRole(user.id);
-    const userAssignee = await getUserAssignee(user.id);
+  // Check if user has access to this assignee (role lookup by email)
+  const userEmail = user.email || '';
+  const userRole = await getUserRole(userEmail);
+  // user_assignees mapping still uses uid (auth user id)
+  const userAssignee = await getUserAssignee(user.id);
 
     if (userRole !== 'admin' && userAssignee !== assigneeGid) {
       notFound();

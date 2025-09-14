@@ -63,6 +63,23 @@ export function DashboardClient({
 
   const filteredMetrics = useMemo(() => metrics, [metrics]);
 
+  // Determine display name for currently selected assignee.
+  // availableDepartments contains assignee objects with `name` prepared as firstname(nickname)
+  const currentAssigneeDisplay = (() => {
+    try {
+      if (!assignee) return undefined;
+      // Search departments for a matching gid
+      for (const dept of availableDepartments || []) {
+        const found = (dept.assignee || []).find(a => a.gid === assignee.gid);
+        if (found && found.name) return found.name;
+      }
+      // fallback to assignee.name (maybe already populated) or email
+      return assignee.name ?? assignee.email;
+    } catch {
+      return assignee?.name ?? assignee?.email;
+    }
+  })();
+
   const handleExportPDF = async () => {
     try {
       setIsExporting(true);
@@ -164,7 +181,7 @@ export function DashboardClient({
                 <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" role="combobox" aria-expanded={assigneePopoverOpen} className="w-[220px] justify-between" size="sm">
-                      {assignee ? `${assignee.email}` : 'Select assignee...'}
+                      {assignee ? `${currentAssigneeDisplay}` : 'Select assignee...'}
                       <ChevronsUpDown className="opacity-50 ml-2" />
                     </Button>
                   </PopoverTrigger>
@@ -178,20 +195,36 @@ export function DashboardClient({
                         {availableDepartments && availableDepartments.length > 0 ? (
                           availableDepartments.map((dept) => (
                             <CommandGroup key={dept.departmentId} heading={dept.name_en}>
-                              {(dept.assignee || []).map(a => (
-                                <CommandItem
-                                  key={a.gid}
-                                  value={`${a.gid} ${a.email ?? a.name ?? ''}`}
-                                  onSelect={() => {
-                                    setAssigneePopoverOpen(false);
-                                    router.push(`/dashboard/${a.gid}`);
-                                  }}
-                                  className="flex items-center gap-2"
-                                >
-                                  <span className="truncate">{a.email ?? a.name}</span>
-                                  <Check className={assignee.gid === a.gid ? 'ml-auto opacity-100' : 'ml-auto opacity-0'} />
-                                </CommandItem>
-                              ))}
+                              {(dept.assignee || []).map(a => {
+                                // Attempt to extract firstname and nickname from a.name if in format "firstname(nickname)"
+                                const rawName = a.name ?? '';
+                                let firstname = '';
+                                let nickname = '';
+                                const nickMatch = rawName.match(/^([^(]+)\(([^)]+)\)$/);
+                                if (nickMatch) {
+                                  firstname = nickMatch[1].trim();
+                                  nickname = nickMatch[2].trim();
+                                } else {
+                                  firstname = rawName;
+                                }
+
+                                const searchValue = `${a.gid} ${a.email ?? ''} ${firstname} ${nickname}`.trim();
+
+                                return (
+                                  <CommandItem
+                                    key={a.gid}
+                                    value={searchValue}
+                                    onSelect={() => {
+                                      setAssigneePopoverOpen(false);
+                                      router.push(`/dashboard/${a.gid}`);
+                                    }}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <span className="truncate">{a.name ?? a.email}</span>
+                                    <Check className={assignee.gid === a.gid ? 'ml-auto opacity-100' : 'ml-auto opacity-0'} />
+                                  </CommandItem>
+                                );
+                              })}
                             </CommandGroup>
                           ))
                         ) : null}

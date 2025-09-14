@@ -20,17 +20,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
-    const userRole = await getUserRole(user.id);
+    // Check if user is admin (lookup by email)
+    const authUserEmail = user.email || '';
+    const userRole = await getUserRole(authUserEmail);
     if (userRole !== 'admin') {
       return NextResponse.json({ error: 'Access denied. Admin role required.' }, { status: 403 });
     }
 
     // Parse request body
     const body = await request.json();
-    const { userEmail } = body;
+  const { userEmail } = body;
 
-    console.log(`Sync started by: ${userEmail}`);
+  console.log(`Sync started by: ${userEmail}`);
 
     // Set sync status to in-progress
     await setLastUpdated('asana_sync', 'in-progress', 'Sync started');

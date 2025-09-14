@@ -583,12 +583,15 @@ export async function hasData(): Promise<boolean> {
 /**
  * Get user role from database
  */
-export async function getUserRole(uid: string): Promise<string | null> {
+// NOTE: user_roles table now uses `user_email` (string) as the lookup column.
+// This function accepts a user email and returns the role string if present.
+export async function getUserRole(userEmail: string): Promise<string | null> {
   try {
+    if (!userEmail) return null;
     const { data, error } = await getSupabaseClient()
       .from('user_roles')
       .select('role')
-      .eq('uid', uid)
+      .eq('user_email', userEmail)
       .single();
 
     if (error && error.code !== 'PGRST116') {
@@ -676,19 +679,15 @@ export async function clearAllData(): Promise<void> {
  */
 export async function getDepartmentsWithAssignees(): Promise<{ departmentId: string; name_en: string; assignee: Assignee[] }[]> {
   try {
-    // Query departments and aggregate assignees into JSON
-    const { data, error } = await getSupabaseClient()
+    // Safer approach: fetch departments and then map assignee_department -> assignee_userinfo + assignees
+    const { data: deps, error: depsErr } = await getSupabaseClient()
       .from('departments')
-      .select(
-      `departmentid, name_en,
-       assignee_department(
-         assignee_gid,
-         departmentid,
-         assignee:assignees(gid,name,email)
-       )`
-      )
+      .select('*')
       .order('departmentid');
 
+    if (depsErr) {
+      throw new Error(`Failed to load departments: ${depsErr.message}`);
+    }
     // // Fallback: if PostgREST nested select didn't return expected shape, run a raw join
     // if (error || !data) {
     //   // Use a safer approach: fetch departments then fetch mappings
@@ -715,24 +714,76 @@ export async function getDepartmentsWithAssignees(): Promise<{ departmentId: str
     //   return result;
     // }
 
-    // If we reached here, `data` may contain departments; normalize as needed
-    // Note: the direct nested select above may not be portable; attempt to map responsively
-    const rows = data;
     const out: { departmentId: string; name_en: string; assignee: Assignee[] }[] = [];
-    if(rows === null) return out;
-    if (error) {
-      throw new Error(`Failed to get departments: ${error.message}`);
-    }
-    for (const r of rows) {
-      // Try to find assignee list in several possible keys
-      const assigneesRaw = r.assignee_department || [];
-      const assignees: Assignee[] = (assigneesRaw || []).map(ar => {
-        // If object has gid/email/name, convert; if it's only assignee_gid, lookup
-        if (ar) return rowToAssignee({gid: ar.assignee_gid, name: ar.assignee?.name || null, email: ar.assignee?.email || null } as AssigneeRow);
-        return null;
-      }).filter(Boolean) as Assignee[];
 
-      out.push({ departmentId: r.departmentid, name_en: r.name_en, assignee: assignees });
+    // For each department, find mapping rows from assignee_department
+    for (const d of deps || []) {
+      const { data: mappings, error: mapErr } = await getSupabaseClient()
+        .from('assignee_department')
+        .select('assignee_email, departmentid')
+        .eq('departmentid', d.departmentid);
+
+      if (mapErr) {
+        console.error(`Failed to load assignee_department for ${d.departmentid}:`, mapErr);
+        continue;
+      }
+
+      const assignees: Assignee[] = [];
+
+      for (const m of mappings || []) {
+        const assigneeEmail = m.assignee_email;
+        if (!assigneeEmail) continue;
+
+        // Lookup assignees table to get gid (link between asana-assignee gid and email)
+        const { data: aRow, error: aErr } = await getSupabaseClient()
+          .from('assignees')
+          .select('gid, name, email')
+          .eq('email', assigneeEmail)
+          .limit(1)
+          .maybeSingle();
+
+        if (aErr) {
+          console.error(`Failed to lookup assignee by email ${assigneeEmail}:`, aErr);
+          continue;
+        }
+
+        // Lookup assignee_userinfo for firstname/nickname
+        const { data: infoRow, error: infoErr } = await getSupabaseClient()
+          .from('assignee_userinfo')
+          .select('assignee_email, firstname, lastname, nickname')
+          .eq('assignee_email', assigneeEmail)
+          .limit(1)
+          .maybeSingle();
+
+        if (infoErr) {
+          console.error(`Failed to lookup assignee_userinfo for ${assigneeEmail}:`, infoErr);
+        }
+
+        // Build display name as "firstname(nickname)" when available
+        let displayName = '';
+        if (infoRow && infoRow.firstname) {
+          displayName = infoRow.firstname;
+          if (infoRow.nickname) displayName += `(${infoRow.nickname})`;
+        }
+
+        if (aRow && aRow.gid) {
+          assignees.push({
+            gid: aRow.gid,
+            name: displayName || (aRow.name || aRow.email || aRow.gid),
+            email: aRow.email || undefined,
+          });
+        } else {
+          // If there's no mapping to `assignees` table, we can still include a placeholder
+          // using the email as the gid so the UI can still navigate to a dashboard if desired.
+          assignees.push({
+            gid: assigneeEmail,
+            name: displayName || assigneeEmail.split('@')[0],
+            email: assigneeEmail,
+          });
+        }
+      }
+
+      out.push({ departmentId: d.departmentid, name_en: d.name_en, assignee: assignees });
     }
 
     return out;

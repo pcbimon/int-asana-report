@@ -17,9 +17,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
-    const userRole = await getUserRole(user.id);
-    if (userRole !== 'admin') {
+  // Check if user is admin (lookup by email)
+  const userEmail = user.email || '';
+  const userRole = await getUserRole(userEmail);
+  if (userRole !== 'admin') {
       return NextResponse.json({ error: 'Access denied. Admin role required.' }, { status: 403 });
     }
 
