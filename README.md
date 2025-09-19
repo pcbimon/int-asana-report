@@ -34,3 +34,29 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Running with Docker Compose (Postgres + Next + Nginx)
+
+This repository includes a `docker-compose.yml` that starts three services:
+
+- `db` — Postgres 17 database
+- `web` — your Next.js app built from the repository `Dockerfile`
+- `nginx` — an `nginx:alpine` reverse proxy that forwards HTTP traffic to the `web` service
+
+Quick start:
+
+1. Copy `.env.example` to `.env` and fill the values (especially `POSTGRES_PASSWORD` and `ASANA_TOKEN`).
+
+2. Build and start the stack:
+
+```powershell
+docker compose up --build
+```
+
+3. Open http://localhost in your browser. Nginx will proxy to the Next.js app served on port 3000.
+
+Notes:
+
+- The `web` service depends on the database and will wait for `db` to report healthy before starting.
+- Files are mounted into the container for easier development (`./:/app`). For production you may want to remove the volume and use the built image only.
+- If you run into permission or file-watch issues on Windows, consider removing the bind mount in `docker-compose.yml`.

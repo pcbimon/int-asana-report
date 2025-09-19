@@ -13,8 +13,11 @@ WORKDIR /app
 COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
 
 # Install dependencies (use npm if lock not present)
+# If yarn.lock exists, only install yarn if it's missing to avoid EEXIST when /usr/local/bin/yarn already exists
 RUN if [ -f yarn.lock ]; then \
-  npm i -g yarn && yarn install --frozen-lockfile; \
+  if ! command -v yarn >/dev/null 2>&1; then \
+    npm i -g yarn; \
+  fi && yarn install --frozen-lockfile; \
 elif [ -f package-lock.json ]; then \
   npm ci; \
 else \
@@ -28,7 +31,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: production image
-FROM node:18-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
