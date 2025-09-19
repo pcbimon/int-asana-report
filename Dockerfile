@@ -2,10 +2,7 @@
 # Builds the app and runs it using 'next start'.
 
 # Stage 1: install dependencies and build
-FROM node:22-alpine AS builder
-
-# Install build deps
-RUN apk add --no-cache python3 make g++
+FROM node:lts-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -31,14 +28,12 @@ COPY . .
 RUN npm run build
 
 # Stage 2: production image
-FROM node:22-alpine AS runner
+FROM node:lts-bookworm-slim AS runner
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install a small runtime dependency (optional)
-RUN apk add --no-cache bash
 
 # Copy only what's needed from builder
 COPY --from=builder /app/package.json ./package.json
@@ -49,7 +44,7 @@ COPY --from=builder /app/public ./public
 EXPOSE 3000
 
 # Use a non-root user for security
-RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
+RUN addgroup --system nextjs && adduser --system --ingroup nextjs --home /app --no-create-home --shell /usr/sbin/nologin nextjs
 USER nextjs
 
 CMD ["npm", "run", "start"]
