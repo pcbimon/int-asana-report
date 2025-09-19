@@ -1,63 +1,78 @@
-# Production-ready multi-stage Dockerfile for Next.js (Node 18)
-# Builds the app and runs it using 'next start'.
+# syntax=docker.io/docker/dockerfile:1
 
-# Stage 1: install dependencies and build
-FROM node:lts-bookworm-slim AS builder
+FROM node:lts-bookworm-slim AS base
 
+# Install dependencies only when needed
+FROM base AS deps
+# This image uses Debian Bookworm slim. The previous apk command was for Alpine
+# and fails here (apk not available). If you need compatibility libraries on
+# Debian, install them with apt (for example: libc6) in a single RUN step.
+# For now we don't install extra packages to keep the image minimal.
 WORKDIR /app
 
-# Copy package manifests first for caching
-COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
+# Install dependencies based on the preferred package manager
+COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
+RUN \
+  if [ -f yarn.lock ]; then \
+    yarn --frozen-lockfile; \
+  elif [ -f package-lock.json ]; then \
+    npm ci; \
+  elif [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm i --frozen-lockfile; \
+  else \
+    echo "No lockfile found - falling back to 'npm install' (not recommended for production builds)"; \
+    npm install --no-audit --no-fund; \
+  fi
 
-# Install dependencies (use npm if lock not present)
-# If yarn.lock exists, only install yarn if it's missing to avoid EEXIST when /usr/local/bin/yarn already exists
-RUN if [ -f yarn.lock ]; then \
-  if ! command -v yarn >/dev/null 2>&1; then \
-    npm i -g yarn; \
-  fi && yarn install --frozen-lockfile; \
-elif [ -f package-lock.json ]; then \
-  npm ci --legacy-peer-deps; \
-else \
-  npm install --legacy-peer-deps; \
-fi
-# ...existing code...
-RUN if [ -f package-lock.json ]; then \
-  npm ci --omit=dev --production --legacy-peer-deps; \
-else \
-  npm install --production --no-audit --no-fund --legacy-peer-deps; \
-fi
 
-# Copy the rest of the project
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build the Next.js app
-RUN npm run build
+# Next.js collects completely anonymous telemetry data about general usage.
+# Learn more here: https://nextjs.org/telemetry
+# Uncomment the following line in case you want to disable telemetry during the build.
+# ENV NEXT_TELEMETRY_DISABLED=1
 
-# Stage 2: production image
-FROM node:lts-bookworm-slim AS runner
+RUN \
+  if [ -f yarn.lock ]; then \
+    yarn run build; \
+  elif [ -f package-lock.json ]; then \
+    npm run build; \
+  elif [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm run build; \
+  else \
+    echo "No lockfile found - falling back to 'npm run build' (not recommended for production builds)"; \
+    npm run build; \
+  fi
 
+# Production image, copy all the files and run next
+FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+# Uncomment the following line in case you want to disable telemetry during runtime.
+# ENV NEXT_TELEMETRY_DISABLED=1
 
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-# Copy only build artifacts and package manifests from builder
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/package-lock.json* ./
-COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 
-# Install only production dependencies in the final image to keep it small
-RUN if [ -f package-lock.json ]; then \
-  npm ci --omit=dev --production; \
-else \
-  npm install --production --no-audit --no-fund; \
-fi
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
 
 EXPOSE 3000
 
-# Use a non-root user for security
-RUN addgroup --system nextjs && adduser --system --ingroup nextjs --home /app --no-create-home --shell /usr/sbin/nologin nextjs || true
-USER nextjs
+ENV PORT=3000
 
-CMD ["npm", "run", "start"]
+# server.js is created by next build from the standalone output
+# https://nextjs.org/docs/pages/api-reference/config/next-config-js/output
+ENV HOSTNAME="0.0.0.0"
+CMD ["node", "server.js"]
