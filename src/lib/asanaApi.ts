@@ -6,18 +6,16 @@
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { Section, Task, Subtask } from '@/models/asanaReport';
 
-// API Configuration
-const BASE_URL = process.env.ASANA_BASE_URL || 'https://app.asana.com/api/1.0';
-const TOKEN = process.env.ASANA_TOKEN;
-const PROJECT_ID = process.env.ASANA_PROJECT_ID;
-const TEAM_ID = process.env.ASANA_TEAM_ID;
+// API Configuration (lazy-read at runtime to avoid build-time errors)
+const DEFAULT_BASE_URL = 'https://app.asana.com/api/1.0';
 
-if (!TOKEN) {
-  throw new Error('ASANA_TOKEN environment variable is required');
-}
+function getConfig() {
+  const baseUrl = process.env.ASANA_BASE_URL || DEFAULT_BASE_URL;
+  const token = process.env.ASANA_TOKEN;
+  const projectId = process.env.ASANA_PROJECT_ID;
+  const teamId = process.env.ASANA_TEAM_ID;
 
-if (!PROJECT_ID) {
-  throw new Error('ASANA_PROJECT_ID environment variable is required');
+  return { baseUrl, token, projectId, teamId };
 }
 
 // Rate limiting configuration
@@ -49,9 +47,15 @@ async function apiRequest<T>(
   retryCount = 0
 ): Promise<T> {
   try {
+    const { token } = getConfig();
+
+    if (!token) {
+      throw new Error('ASANA_TOKEN environment variable is required');
+    }
+
     const response: AxiosResponse<{ data: T }> = await axios.get(url, {
       headers: {
-        'Authorization': `Bearer ${TOKEN}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       timeout: 30000, // 30 second timeout
@@ -156,10 +160,11 @@ interface AsanaTeamMember {
  */
 export async function fetchSections(): Promise<Section[]> {
   try {
-    console.log('Fetching sections for project:', PROJECT_ID);
-    
-    const url = `${BASE_URL}/projects/${PROJECT_ID}/sections`;
-    const sections = await apiRequest<AsanaSection[]>(url);
+    const { baseUrl, projectId } = getConfig();
+    console.log('Fetching sections for project:', projectId);
+
+      const url = `${baseUrl}/projects/${projectId}/sections`;
+      const sections = await apiRequest<AsanaSection[]>(url);
     
     console.log(`Fetched ${sections.length} sections`);
     
@@ -181,8 +186,9 @@ export async function fetchTasksInSection(sectionGid: string): Promise<Task[]> {
   try {
     console.log('Fetching tasks for section:', sectionGid);
     
-    const url = `${BASE_URL}/sections/${sectionGid}/tasks?opt_fields=name,assignee,completed,completed_at,due_on,projects,created_at`;
-    const tasks = await apiRequest<AsanaTask[]>(url);
+  const { baseUrl } = getConfig();
+  const url = `${baseUrl}/sections/${sectionGid}/tasks?opt_fields=name,assignee,completed,completed_at,due_on,projects,created_at`;
+  const tasks = await apiRequest<AsanaTask[]>(url);
     
     console.log(`Fetched ${tasks.length} tasks for section ${sectionGid}`);
     
@@ -213,8 +219,9 @@ export async function fetchTasksInSection(sectionGid: string): Promise<Task[]> {
  */
 export async function fetchSubtasks(taskGid: string): Promise<Subtask[]> {
   try {
-    const url = `${BASE_URL}/tasks/${taskGid}/subtasks?opt_fields=name,assignee,completed,created_at,completed_at,due_on,followers.name`;
-    const subtasks = await apiRequest<AsanaSubtask[]>(url);
+  const { baseUrl } = getConfig();
+  const url = `${baseUrl}/tasks/${taskGid}/subtasks?opt_fields=name,assignee,completed,created_at,completed_at,due_on,followers.name`;
+  const subtasks = await apiRequest<AsanaSubtask[]>(url);
 
     return subtasks.map(subtask => ({
       gid: subtask.gid,
@@ -241,11 +248,12 @@ export async function fetchSubtasks(taskGid: string): Promise<Subtask[]> {
  */
 export async function fetchTeamMembers(): Promise<AsanaTeamMember[]> {
   try {
-    console.log('Fetching team members for project:', TEAM_ID);
-    if (!TEAM_ID) {
+    const { baseUrl, teamId } = getConfig();
+    console.log('Fetching team members for project:', teamId);
+    if (!teamId) {
       throw new Error('ASANA_TEAM_ID environment variable is required to fetch team members');
     }
-    const url = `${BASE_URL}/team_memberships?team=${TEAM_ID}`;
+    const url = `${baseUrl}/team_memberships?team=${teamId}`;
     const members = await apiRequest<AsanaTeamMember[]>(url);
     
     console.log(`Fetched ${members.length} team members`);
@@ -260,7 +268,8 @@ export async function fetchTeamMembers(): Promise<AsanaTeamMember[]> {
  */
 export async function fetchUserInfo(userGid:string): Promise<AsanaUserInfo> {
   try {
-    const url = `${BASE_URL}/users/${userGid}`;
+  const { baseUrl } = getConfig();
+  const url = `${baseUrl}/users/${userGid}`;
     const userInfo = await apiRequest<AsanaUserInfo>(url);
     return {
       gid: userInfo.gid,
@@ -350,8 +359,9 @@ export async function fetchCompleteReport(): Promise<{
  */
 export async function testConnection(): Promise<boolean> {
   try {
-    const url = `${BASE_URL}/users/me`;
-    await apiRequest(url);
+  const { baseUrl } = getConfig();
+  const url = `${baseUrl}/users/me`;
+  await apiRequest(url);
     console.log('Asana API connection successful');
     return true;
   } catch (error) {

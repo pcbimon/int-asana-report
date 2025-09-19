@@ -96,14 +96,7 @@ export function SyncClient({ lastSync, userEmail }: SyncClientProps) {
   }, [currentSync, router]);
 
   useEffect(() => {
-    // Trigger sync when `forceSync` prop becomes true. This is a one-time trigger per mount
-    // to mirror the previous behavior but explicit via prop.
-    try {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    } catch (err) {
-      console.error('Unexpected error in forceSync effect setup:', err);
-    }
-
+    // Trigger polling of sync status while a sync is in progress
     let pollInterval: NodeJS.Timeout | undefined;
 
     if (isLoading) {
@@ -129,7 +122,7 @@ export function SyncClient({ lastSync, userEmail }: SyncClientProps) {
     return () => {
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [isLoading, handleSync]);
+  }, [isLoading]);
 
 
   const getStatusIcon = (status: string) => {

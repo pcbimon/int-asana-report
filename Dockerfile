@@ -16,9 +16,15 @@ RUN if [ -f yarn.lock ]; then \
     npm i -g yarn; \
   fi && yarn install --frozen-lockfile; \
 elif [ -f package-lock.json ]; then \
-  npm ci; \
+  npm ci --legacy-peer-deps; \
 else \
-  npm install; \
+  npm install --legacy-peer-deps; \
+fi
+# ...existing code...
+RUN if [ -f package-lock.json ]; then \
+  npm ci --omit=dev --production --legacy-peer-deps; \
+else \
+  npm install --production --no-audit --no-fund --legacy-peer-deps; \
 fi
 
 # Copy the rest of the project
@@ -35,16 +41,23 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 
-# Copy only what's needed from builder
+# Copy only build artifacts and package manifests from builder
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package-lock.json* ./
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
+
+# Install only production dependencies in the final image to keep it small
+RUN if [ -f package-lock.json ]; then \
+  npm ci --omit=dev --production; \
+else \
+  npm install --production --no-audit --no-fund; \
+fi
 
 EXPOSE 3000
 
 # Use a non-root user for security
-RUN addgroup --system nextjs && adduser --system --ingroup nextjs --home /app --no-create-home --shell /usr/sbin/nologin nextjs
+RUN addgroup --system nextjs && adduser --system --ingroup nextjs --home /app --no-create-home --shell /usr/sbin/nologin nextjs || true
 USER nextjs
 
 CMD ["npm", "run", "start"]

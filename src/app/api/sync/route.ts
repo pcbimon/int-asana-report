@@ -9,7 +9,7 @@ import { getUserRole } from '@/lib/storage';
 import { fetchCompleteReport } from '@/lib/asanaApi';
 import { saveReport, setLastUpdated } from '@/lib/storage';
 import { AsanaReport } from '@/models/asanaReport';
-
+export const dynamic = 'force-static';
 export async function POST(request: NextRequest) {
   try {
     // Allow server-to-server scheduled jobs to call this endpoint using a service key
