@@ -2,7 +2,7 @@ services:
   db:
     ports:
       - "5432:5432"
-    image: postgres:17
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -10,6 +10,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - ./volumes/db_data:/var/lib/postgresql/data
+      # - db_initial.sql:/docker-entrypoint-initdb.d/db_initial.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
