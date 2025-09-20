@@ -1,5 +1,5 @@
 import { FiTarget } from "react-icons/fi";
-import { IoMdTrendingUp } from "react-icons/io";
+import { IoMdCheckmarkCircleOutline, IoMdTrendingUp } from "react-icons/io";
 import { BsExclamationTriangle } from "react-icons/bs";
 import {
   Card,
@@ -32,7 +32,7 @@ export default function SummaryMetricCard() {
           <div className="flex items-center justify-between">
             <CardTitle>Completed</CardTitle>
             <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center">
-              <FiTarget className="text-green-500" />
+              <IoMdCheckmarkCircleOutline className="text-green-500" />
             </div>
           </div>
         </CardHeader>
