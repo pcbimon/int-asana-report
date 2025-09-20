@@ -3,10 +3,8 @@ import { IoMdTrendingUp } from "react-icons/io";
 import { BsExclamationTriangle } from "react-icons/bs";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
