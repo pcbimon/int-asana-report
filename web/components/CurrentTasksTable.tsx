@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { MdOutlineAccessTime } from "react-icons/md";
 import { IoMdCheckmarkCircleOutline } from "react-icons/io";
 import { BsExclamationTriangle } from "react-icons/bs";
+import { FaList } from "react-icons/fa6";
 import {
   Table,
   TableBody,
@@ -28,17 +29,21 @@ export default function CurrentTasksTable() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Current Tasks (56)</h2>
             <div className="flex space-x-2">
-              <Button variant="default" size="sm">
-                All
+              <Button variant="default" size="sm" className="flex items-center space-x-2">
+              <FaList className="w-4 h-4" />
+              <span className="hidden sm:inline">All</span>
               </Button>
-              <Button variant="outline" size="sm">
-                <MdOutlineAccessTime /> Pending
+              <Button variant="outline" size="sm" className="flex items-center space-x-2">
+              <MdOutlineAccessTime className="w-4 h-4" />
+              <span className="hidden sm:inline">Pending</span>
               </Button>
-              <Button variant="outline" size="sm">
-                <IoMdCheckmarkCircleOutline /> Completed
+              <Button variant="outline" size="sm" className="flex items-center space-x-2">
+              <IoMdCheckmarkCircleOutline className="w-4 h-4" />
+              <span className="hidden sm:inline">Completed</span>
               </Button>
-              <Button variant="outline" size="sm">
-                <BsExclamationTriangle /> Overdue
+              <Button variant="outline" size="sm" className="flex items-center space-x-2">
+              <BsExclamationTriangle className="w-4 h-4" />
+              <span className="hidden sm:inline">Overdue</span>
               </Button>
             </div>
           </div>
