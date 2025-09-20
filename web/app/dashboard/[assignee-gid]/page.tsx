@@ -9,6 +9,7 @@ import React from "react";
 import "../../globals.css";
 import SummaryMetricCard from "@/components/SummaryMatricCard";
 import WeeklySummaryChart from "@/components/WeeklySummaryChart";
+import CurrentTasksTable from "@/components/CurrentTasksTable";
 export default function DashboardPage() {
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -36,6 +37,7 @@ export default function DashboardPage() {
         </Card>
         <SummaryMetricCard />
         <WeeklySummaryChart />
+        <CurrentTasksTable />
       </div>
     </div>
   );
