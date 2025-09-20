@@ -8,6 +8,7 @@ import { FaFileExcel, FaFilePdf } from "react-icons/fa";
 import React from "react";
 import "../../globals.css";
 import SummaryMetricCard from "@/components/SummaryMatricCard";
+import WeeklySummaryChart from "@/components/WeeklySummaryChart";
 export default function DashboardPage() {
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -34,6 +35,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         <SummaryMetricCard />
+        <WeeklySummaryChart />
       </div>
     </div>
   );
