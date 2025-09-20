@@ -20,6 +20,7 @@ export default function DashboardPage() {
               <div className="flex flex-col">
                 <h1 className="text-2xl font-bold">Dashboard Overview</h1>
                 <h1 className="text-xl font-light">Patipat Chewprecha</h1>
+                <h3 className="text-sm font-light text-gray-400">Last sync: 01 Oct 2023 12:00:00 PM</h3>
               </div>
               <div className="flex-grow text-right space-x-2">
                 <Button variant="outline">
