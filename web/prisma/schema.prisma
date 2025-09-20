@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model assignees {
+  email          String           @id(map: "assignees_pk")
+  firstname      String
+  lastname       String
+  assignee_gid   String?          @unique(map: "assignees_uq_gid")
+  subtasks       subtasks[]
+  task_followers task_followers[]
+}
+
+model sections {
+  gid   String  @id(map: "sections_pk")
+  name  String
+  tasks tasks[]
+}
+
+model subtasks {
+  gid             String           @id(map: "subtasks_pk")
+  name            String?
+  parent_task_gid String?
+  assignee_gid    String?
+  completed       Boolean?
+  created_at      DateTime?        @db.Timestamptz(6)
+  completed_at    DateTime?        @db.Timestamptz(6)
+  assignees       assignees?       @relation(fields: [assignee_gid], references: [assignee_gid], onDelete: NoAction, onUpdate: NoAction, map: "subtasks_assignees_assignee_gid_fk")
+  tasks           tasks?           @relation(fields: [parent_task_gid], references: [gid], onDelete: NoAction, onUpdate: NoAction, map: "subtasks_tasks_gid_fk")
+  task_followers  task_followers[]
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model sync_metadata {
+  key        String    @id(map: "sync_metadata_pk")
+  message    String?
+  updated_at DateTime? @db.Timestamptz(6)
+
+  @@ignore
+}
+
+model task_followers {
+  task_gid     String
+  follower_gid String
+  gid          String    @id(map: "task_followers_pk")
+  assignees    assignees @relation(fields: [follower_gid], references: [assignee_gid], onDelete: NoAction, onUpdate: NoAction, map: "task_followers_assignees_assignee_gid_fk")
+  subtasks     subtasks  @relation(fields: [task_gid], references: [gid], onDelete: NoAction, onUpdate: NoAction, map: "task_followers_subtasks_gid_fk")
+}
+
+model tasks {
+  gid          String     @id(map: "tasks_pk")
+  name         String?
+  section_gid  String?
+  completed    Boolean?
+  completed_at DateTime?  @db.Timestamptz(6)
+  due_on       DateTime?  @db.Date
+  project      String?
+  created_at   DateTime?  @db.Timestamptz(6)
+  subtasks     subtasks[]
+  sections     sections?  @relation(fields: [section_gid], references: [gid], onDelete: NoAction, onUpdate: NoAction, map: "tasks_sections_gid_fk")
+}
