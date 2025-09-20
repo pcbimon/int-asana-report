@@ -75,7 +75,7 @@ export default function WeeklySummaryChart() {
                             type: 'line',
                             symbol: 'circle',
                             smooth: true,
-                            lineStyle: { type: 'dotted', color: '#e67e22' }, // orange dotted
+                            lineStyle: { type: 'dotted', color: '#f1c40f' }, // yellow dotted
                             itemStyle: { color: '#d35400' },
                             data: [3,3,3,3,3,3,3]
                         }
