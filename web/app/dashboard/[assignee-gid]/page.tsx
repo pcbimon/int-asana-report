@@ -10,6 +10,7 @@ import "../../globals.css";
 import SummaryMetricCard from "@/components/SummaryMatricCard";
 import WeeklySummaryChart from "@/components/WeeklySummaryChart";
 import CurrentTasksTable from "@/components/CurrentTasksTable";
+import AdminSection from "@/components/AdminSection";
 export default function DashboardPage() {
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -36,6 +37,7 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+        <AdminSection />
         <SummaryMetricCard />
         <WeeklySummaryChart />
         <CurrentTasksTable />
