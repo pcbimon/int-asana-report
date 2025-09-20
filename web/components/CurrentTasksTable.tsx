@@ -106,7 +106,7 @@ export default function CurrentTasksTable() {
                   </div>
                 </TableCell>
                 <TableCell>01 Oct 2025</TableCell>
-                <TableCell>15 Oct 2023</TableCell>
+                <TableCell>-</TableCell>
                 <TableCell>
                   <Badge variant="secondary">
                     <MdOutlineAccessTime /> Pending
