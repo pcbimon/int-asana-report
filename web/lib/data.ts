@@ -67,7 +67,7 @@ export async function getSummaryMetrics(assigneeGid: string) {
 export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint[]> {
   // Group by parent task (which encodes the week) and count subtasks
   const tasks = await prisma.tasks.findMany({
-    select: { gid: true, name: true, due_on: true, completed: true },
+    select: { gid: true, name: true, due_on: true, completed: true, week_startdate: true },
     orderBy: { created_at: "asc" },
   });
 
@@ -88,7 +88,8 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
     tasks.map((t) => [
       t.gid,
       {
-        label: t.name ?? "",
+        // Prefer week_startdate (if present) formatted for display, otherwise fall back to task name
+        label: t.week_startdate ? new Date(t.week_startdate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : t.name ?? "",
         assigned: 0,
         completed: 0,
         overdue: 0,
@@ -139,7 +140,7 @@ export async function getCurrentTasks(
         assignee_gid: true,
         completed: true,
         created_at: true,
-        tasks: { select: { gid: true, name: true, due_on: true } },
+        tasks: { select: { gid: true, name: true, due_on: true, week_startdate: true } },
       },
     }),
     prisma.task_followers.findMany({
@@ -151,7 +152,7 @@ export async function getCurrentTasks(
   const followerTaskIds = new Set(followerLinks.map((f) => f.task_gid));
   const followedSubtasks = await prisma.subtasks.findMany({
     where: { gid: { in: Array.from(followerTaskIds) } },
-    select: { gid: true, name: true, assignee_gid: true, completed: true, created_at: true, tasks: { select: { gid: true, name: true, due_on: true } } },
+    select: { gid: true, name: true, assignee_gid: true, completed: true, created_at: true, tasks: { select: { gid: true, name: true, due_on: true, week_startdate: true } } },
   });
 
   // Build rows
@@ -162,7 +163,8 @@ export async function getCurrentTasks(
     allRows.push({
       gid: st.gid,
       name: st.name ?? "",
-      week: st.tasks?.name ?? "",
+      // Prefer formatted week_startdate when available
+      week: st.tasks?.week_startdate ? new Date(st.tasks.week_startdate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : st.tasks?.name ?? "",
       created_at: st.created_at ?? null,
       due_on: st.tasks?.due_on ?? null,
       status: statusStr,
