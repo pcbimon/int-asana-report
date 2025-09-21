@@ -72,7 +72,7 @@ async function withBackoff<T>(fn: () => Promise<T>, attempt = 0): Promise<T> {
 
 type AsanaUser = { gid: string; name?: string; email?: string };
 type AsanaSection = { gid: string; name: string };
-type AsanaTask = { gid: string; name?: string; due_on?: string | null; completed?: boolean; created_at?: string | null; memberships?: { section?: { gid?: string } }[] };
+type AsanaTask = { gid: string; name?: string; due_on?: string | null; completed?: boolean; created_at?: string | null; memberships?: { section?: { gid?: string } }[]; week_startdate?: string | null };
 type AsanaSubtask = { gid: string; name?: string; completed?: boolean; created_at?: string | null; completed_at?: string | null; assignee?: AsanaUser | null; followers?: AsanaUser[]; due_on?: string | null };
 
 export async function syncFromAsana() {
@@ -131,6 +131,65 @@ export async function syncFromAsana() {
     // memberships can include section info; try to find the section gid
     const memberships = (t as unknown as { memberships?: { section?: { gid?: string } }[] }).memberships;
     const section_gid = memberships && memberships.length ? memberships[0].section?.gid ?? null : null;
+    // Attempt to parse week start date from the task name if present.
+    // Common formats: "Week of 26 May 2025", "Week of 26-30 May 2025", "Week of 30 June-4 July 2025"
+    function parseWeekStartDateFromName(name?: string): Date | null {
+      if (!name) return null;
+      const lower = name.toLowerCase();
+      // require the word "week" to avoid false positives
+      if (!/week/.test(lower)) return null;
+
+      // find a 4-digit year
+      const yearMatch = lower.match(/(20\d{2}|19\d{2})/);
+      const year = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
+
+      // Take the substring after "week" and before the year (if present)
+      const afterWeek = lower.split(/week(?: of)?/i)[1] ?? lower;
+      const beforeYear = afterWeek.replace(/\b(20\d{2}|19\d{2})\b/, '').trim();
+
+      // Normalize separators and tokens
+      const part = beforeYear.replace(/–|—/g, '-');
+      // tokens split by dash; first token typically contains the start day and maybe month
+      const tokens = part.split('-').map(s => s.trim()).filter(Boolean);
+      const first = tokens[0] ?? part;
+
+      // Look for "DD Month" or just "DD"
+      const dm = first.match(/(\d{1,2})\s*([a-zA-Z]+)/);
+      let day: number | null = null;
+      let month: number | null = null;
+      const MONTHS: Record<string, number> = {
+        jan: 0, january: 0,
+        feb: 1, february: 1,
+        mar: 2, march: 2,
+        apr: 3, april: 3,
+        may: 4,
+        jun: 5, june: 5,
+        jul: 6, july: 6,
+        aug: 7, august: 7,
+        sep: 8, sept: 8, september: 8,
+        oct: 9, october: 9,
+        nov: 10, november: 10,
+        dec: 11, december: 11,
+      };
+
+      if (dm) {
+        day = parseInt(dm[1], 10);
+        month = MONTHS[dm[2].toLowerCase()] ?? null;
+      } else {
+        const dOnly = first.match(/(\d{1,2})/);
+        if (dOnly) day = parseInt(dOnly[1], 10);
+        // try to find month in the whole part
+        const mMatch = part.match(/(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|jun(e)?|jul(y)?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?)/i);
+        if (mMatch) month = MONTHS[mMatch[0].toLowerCase()] ?? null;
+      }
+
+      if (day == null || month == null) return null;
+      // Construct date in the current (server) timezone
+      return new Date(year, month, day, 0, 0, 0);
+    }
+
+    const parsedWeekStart = parseWeekStartDateFromName(t.name ?? undefined);
+
     return {
       gid: t.gid,
       name: t.name ?? null,
@@ -139,6 +198,7 @@ export async function syncFromAsana() {
       due_on: t.due_on ? new Date(t.due_on) : null,
       created_at: t.created_at ? new Date(t.created_at) : null,
       project: ASANA_PROJECT_ID,
+      week_startdate: parsedWeekStart,
     };
   });
 

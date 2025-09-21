@@ -62,5 +62,6 @@ model tasks {
   project      String?
   created_at   DateTime?  @db.Timestamptz(6)
   subtasks     subtasks[]
+  week_startdate  DateTime?  @db.Timestamptz(6)
   sections     sections?  @relation(fields: [section_gid], references: [gid], onDelete: NoAction, onUpdate: NoAction, map: "tasks_sections_gid_fk")
 }
