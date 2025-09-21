@@ -140,13 +140,25 @@ export async function syncFromAsana() {
         });
 
         // Only create follower links for followers that already exist in our assignees table.
+        // Do not create a follower link when the follower is the same as the subtask assignee
+        // and avoid duplicate inserts by using createMany with skipDuplicates.
         if (st.followers?.length) {
+          const followerGids = new Set<string>();
           for (const f of st.followers) {
             if (!f.gid) continue;
+            // skip if follower is same as the assignee of this subtask
+            if (f.gid === assigneeToSet) continue;
             const followerExists = await prisma.assignees.findUnique({ where: { assignee_gid: f.gid } as any }).catch(() => null);
             if (followerExists) {
-              await prisma.task_followers.create({ data: { task_gid: st.gid, follower_gid: f.gid } });
+              followerGids.add(f.gid);
             }
+          }
+
+          if (followerGids.size > 0) {
+            await prisma.task_followers.createMany({
+              data: Array.from(followerGids).map((gid) => ({ task_gid: st.gid, follower_gid: gid })),
+              skipDuplicates: true,
+            });
           }
         }
       }
