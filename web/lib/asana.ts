@@ -81,14 +81,8 @@ export async function syncFromAsana() {
   console.log(`[asana] starting sync for project ${ASANA_PROJECT_ID}`);
   const client = createClient();
 
-  // Destructive sync: clear tables in an order that respects FKs
-  console.log('[asana] clearing existing data (task_followers, subtasks, tasks, sections)');
-  await prisma.$transaction([
-    prisma.task_followers.deleteMany(),
-    prisma.subtasks.deleteMany(),
-    prisma.tasks.deleteMany(),
-    prisma.sections.deleteMany(),
-  ]);
+  // Note: destructive delete moved later — we must validate date conversions
+  // before removing existing data to avoid destructive failure.
 
   // Optionally refresh assignees from team (unchanged behavior)
   if (ASANA_TEAM_ID) {
@@ -114,11 +108,7 @@ export async function syncFromAsana() {
   console.log('[asana] fetching sections');
   const sections: AsanaSection[] = await paginate<AsanaSection>(client, `/projects/${ASANA_PROJECT_ID}/sections`);
   console.log(`[asana] fetched ${sections.length} sections`);
-  if (sections.length > 0) {
-    const data = sections.map((s) => ({ gid: s.gid, name: s.name }));
-    console.log(`[asana] inserting ${data.length} sections`);
-    await prisma.sections.createMany({ data, skipDuplicates: true });
-  }
+  // NOTE: do not insert sections yet; wait until after validation and destructive delete
 
   // 2) Tasks for the project. Use the project tasks endpoint to avoid per-section fetching.
   // Include minimal fields we need.
@@ -127,6 +117,8 @@ export async function syncFromAsana() {
   console.log(`[asana] fetched ${tasks.length} tasks`);
 
   // Prepare tasks for bulk insert, map section membership if present
+  const parseFailures: { gid: string; name?: string }[] = [];
+
   const taskRows = tasks.map((t) => {
     // memberships can include section info; try to find the section gid
     const memberships = (t as unknown as { memberships?: { section?: { gid?: string } }[] }).memberships;
@@ -190,6 +182,20 @@ export async function syncFromAsana() {
 
     const parsedWeekStart = parseWeekStartDateFromName(t.name ?? undefined);
 
+    // If parsing failed, record for logging and fall back to created_at, due_on, then now
+    let finalWeekStart: Date | null = parsedWeekStart ?? null;
+    if (!finalWeekStart) {
+      parseFailures.push({ gid: t.gid, name: t.name });
+      if (t.created_at) finalWeekStart = new Date(t.created_at);
+      else if (t.due_on) finalWeekStart = new Date(t.due_on);
+      else finalWeekStart = new Date();
+    }
+
+    // Validate the finalWeekStart is a valid date. If invalid, throw to abort sync
+    if (!finalWeekStart || !isFinite(finalWeekStart.getTime())) {
+      throw new Error(`Invalid week_startdate for task ${t.gid} (${t.name ?? '<no-name>'})`);
+    }
+
     return {
       gid: t.gid,
       name: t.name ?? null,
@@ -198,9 +204,25 @@ export async function syncFromAsana() {
       due_on: t.due_on ? new Date(t.due_on) : null,
       created_at: t.created_at ? new Date(t.created_at) : null,
       project: ASANA_PROJECT_ID,
-      week_startdate: parsedWeekStart,
+      week_startdate: finalWeekStart,
     };
   });
+
+  // All tasks validated at this point. Proceed with destructive delete.
+  console.log('[asana] clearing existing data (task_followers, subtasks, tasks, sections)');
+  await prisma.$transaction([
+    prisma.task_followers.deleteMany(),
+    prisma.subtasks.deleteMany(),
+    prisma.tasks.deleteMany(),
+    prisma.sections.deleteMany(),
+  ]);
+
+  // Insert sections now that the DB is cleared and validation passed
+  if (sections.length > 0) {
+    const data = sections.map((s) => ({ gid: s.gid, name: s.name }));
+    console.log(`[asana] inserting ${data.length} sections`);
+    await prisma.sections.createMany({ data, skipDuplicates: true });
+  }
 
   if (taskRows.length > 0) {
     // Insert in chunks to avoid large single queries
@@ -292,11 +314,23 @@ export async function syncFromAsana() {
     await insertInChunks(followerRows, prisma.task_followers.createMany.bind(prisma.task_followers));
   }
 
-  await prisma.sync_metadata.upsert({
-    where: { key: "asana_sync" },
-    update: { updated_at: new Date(), message: "OK" },
-    create: { key: "asana_sync", updated_at: new Date(), message: "OK" },
-  });
+  // Write sync metadata. If there were parse failures, include a summary message.
+  const now = new Date();
+  if (parseFailures.length > 0) {
+    const sample = parseFailures.slice(0, 5).map((p) => `${p.gid}:${p.name ?? "<no-name>"}`).join('; ');
+    const msg = `parsed_week_start failures=${parseFailures.length}; examples=${sample}`;
+    await prisma.sync_metadata.upsert({
+      where: { key: "asana_sync" },
+      update: { updated_at: now, message: msg },
+      create: { key: "asana_sync", updated_at: now, message: msg },
+    });
+  } else {
+    await prisma.sync_metadata.upsert({
+      where: { key: "asana_sync" },
+      update: { updated_at: now, message: "OK" },
+      create: { key: "asana_sync", updated_at: now, message: "OK" },
+    });
+  }
 
   return { sections: sections.length, tasks: tasks.length, subtasks: subtaskRows.length };
 }
