@@ -5,6 +5,39 @@ const ASANA_BASE_URL = process.env.ASANA_BASE_URL || "https://app.asana.com/api/
 const ASANA_TOKEN = process.env.ASANA_TOKEN as string;
 const ASANA_PROJECT_ID = process.env.ASANA_PROJECT_ID as string;
 const ASANA_TEAM_ID = process.env.ASANA_TEAM_ID as string | undefined;
+// ASANA_RATE_LIMIT controls max requests per hour. Default 1500 requests/hour.
+// If the env is invalid or <= 0, we fall back to the default.
+const ASANA_RATE_LIMIT = (() => {
+  const raw = Number(process.env.ASANA_RATE_LIMIT ?? 1500);
+  if (!Number.isFinite(raw) || raw <= 0) return 1500;
+  return Math.floor(raw);
+})();
+
+// Compute milliseconds between request start times to keep under the hourly limit
+const MS_PER_HOUR = 60 * 60 * 1000;
+const msBetweenRequests = Math.max(0, Math.floor(MS_PER_HOUR / ASANA_RATE_LIMIT));
+
+// Simple serial rate limiter: chain requests so their start times are at least
+// `msBetweenRequests` apart. This is intentionally simple (start-time spacing)
+// and avoids adding dependencies. Retries will also be paced through this limiter.
+let lastRequestStart = 0;
+let rateChain: Promise<void> = Promise.resolve();
+
+async function waitForRateTurn() {
+  const scheduled = rateChain.then(async () => {
+    const now = Date.now();
+    const since = now - lastRequestStart;
+    const wait = Math.max(0, msBetweenRequests - since);
+    if (wait > 0) {
+      await new Promise((r) => setTimeout(r, wait));
+    }
+    // Mark start time for spacing next request
+    lastRequestStart = Date.now();
+  });
+  // Keep chain alive regardless of success/failure
+  rateChain = scheduled.catch(() => {}).then(() => {});
+  return scheduled;
+}
 
 if (!ASANA_TOKEN) {
   // We allow import without env in dev, actual sync will throw if missing
@@ -17,6 +50,9 @@ function createClient(): AxiosInstance {
 
 async function withBackoff<T>(fn: () => Promise<T>, attempt = 0): Promise<T> {
   try {
+    // Ensure we don't exceed ASANA_RATE_LIMIT: wait for our turn before each
+    // network attempt. This spaces start times of requests.
+    await waitForRateTurn();
     return await fn();
   } catch (e) {
     const err = e as AxiosError;

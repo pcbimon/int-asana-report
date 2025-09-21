@@ -73,7 +73,7 @@
 - `ASANA_PROJECT_ID` : GID ของ Project ใน Asana
 - `REPORT_EXPECTED_TASKS_PER_WEEK` : จำนวนงานที่คาดหวังต่อสัปดาห์ (ใช้ในกราฟสรุป)
 - `ASANA_TEAM_ID` : GID ของทีมใน Asana
-- `ASANA_RATE_LIMIT` : จำนวนครั้งสูงสุดที่สามารถเรียก Asana API ได้ต่อชั่วโมง (ค่าเริ่มต้นคือ 1500)
+- `ASANA_RATE_LIMIT` : จำนวนครั้งสูงสุดที่สามารถเรียก Asana APIได้ต่อชั่วโมง (default: 1500 requests per hour)
 
 ## Asana API Rate Limits
 Asana API มีข้อจำกัดในการเรียกใช้งาน (Rate Limits) เพื่อป้องกันการใช้งานที่เกินขีดจำกัด ซึ่งอาจส่งผลให้การเรียก API ถูกบล็อกหรือถูกปฏิเสธ
