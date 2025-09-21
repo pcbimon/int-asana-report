@@ -73,7 +73,7 @@ async function withBackoff<T>(fn: () => Promise<T>, attempt = 0): Promise<T> {
 type AsanaUser = { gid: string; name?: string; email?: string };
 type AsanaSection = { gid: string; name: string };
 type AsanaTask = { gid: string; name?: string; due_on?: string | null; completed?: boolean; created_at?: string | null; memberships?: { section?: { gid?: string } }[] };
-type AsanaSubtask = { gid: string; name?: string; completed?: boolean; created_at?: string | null; completed_at?: string | null; assignee?: AsanaUser | null; followers?: AsanaUser[] };
+type AsanaSubtask = { gid: string; name?: string; completed?: boolean; created_at?: string | null; completed_at?: string | null; assignee?: AsanaUser | null; followers?: AsanaUser[]; due_on?: string | null };
 
 export async function syncFromAsana() {
   if (!ASANA_PROJECT_ID) throw new Error("ASANA_PROJECT_ID is required");
@@ -156,7 +156,7 @@ export async function syncFromAsana() {
   const allSubtasks: Array<{ sub: AsanaSubtask; parentTaskGid: string }> = [];
   for (const t of tasks) {
     console.log(`[asana] fetching subtasks for task ${t.gid}`);
-    const subs: AsanaSubtask[] = await paginate<AsanaSubtask>(client, `/tasks/${t.gid}/subtasks`, { params: { opt_fields: "name,completed,created_at,completed_at,assignee,followers" } });
+    const subs: AsanaSubtask[] = await paginate<AsanaSubtask>(client, `/tasks/${t.gid}/subtasks`, { params: { opt_fields: "name,completed,created_at,completed_at,assignee,followers,due_on" } });
     for (const st of subs) {
       allSubtasks.push({ sub: st, parentTaskGid: t.gid });
     }
@@ -166,12 +166,13 @@ export async function syncFromAsana() {
   // Build subtask rows and follower rows
   type SubtaskRow = {
     gid: string;
-    name: string | null;
-    parent_task_gid: string;
-    assignee_gid: string | null;
-    completed: boolean | null;
-    created_at: Date | null;
-    completed_at: Date | null;
+      name: string | null;
+      parent_task_gid: string;
+      assignee_gid: string | null;
+      completed: boolean | null;
+      created_at: Date | null;
+      completed_at: Date | null;
+      due_on: Date | null;
   };
 
   const subtaskRows: SubtaskRow[] = [];
@@ -196,6 +197,7 @@ export async function syncFromAsana() {
       completed: st.completed ?? null,
       created_at: st.created_at ? new Date(st.created_at) : null,
       completed_at: st.completed_at ? new Date(st.completed_at) : null,
+      due_on: st.due_on ? new Date(st.due_on) : null,
     });
 
     if (st.followers?.length) {

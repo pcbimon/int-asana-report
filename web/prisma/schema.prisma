@@ -34,6 +34,7 @@ model subtasks {
   assignees       assignees?       @relation(fields: [assignee_gid], references: [assignee_gid], onDelete: NoAction, onUpdate: NoAction, map: "subtasks_assignees_assignee_gid_fk")
   tasks           tasks?           @relation(fields: [parent_task_gid], references: [gid], onDelete: NoAction, onUpdate: NoAction, map: "subtasks_tasks_gid_fk")
   task_followers  task_followers[]
+  due_on          DateTime?         @db.Timestamptz(6)
 }
 
 model sync_metadata {
@@ -57,7 +58,7 @@ model tasks {
   section_gid  String?
   completed    Boolean?
   completed_at DateTime?  @db.Timestamptz(6)
-  due_on       DateTime?  @db.Date
+  due_on       DateTime?  @db.Timestamptz(6)
   project      String?
   created_at   DateTime?  @db.Timestamptz(6)
   subtasks     subtasks[]
