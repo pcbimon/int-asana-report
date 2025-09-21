@@ -36,21 +36,19 @@ model subtasks {
   task_followers  task_followers[]
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model sync_metadata {
   key        String    @id(map: "sync_metadata_pk")
   message    String?
   updated_at DateTime? @db.Timestamptz(6)
-
-  @@ignore
 }
 
 model task_followers {
   task_gid     String
   follower_gid String
-  gid          String    @id(map: "task_followers_pk")
   assignees    assignees @relation(fields: [follower_gid], references: [assignee_gid], onDelete: NoAction, onUpdate: NoAction, map: "task_followers_assignees_assignee_gid_fk")
   subtasks     subtasks  @relation(fields: [task_gid], references: [gid], onDelete: NoAction, onUpdate: NoAction, map: "task_followers_subtasks_gid_fk")
+
+  @@unique([follower_gid, task_gid], map: "task_followers_pk")
 }
 
 model tasks {
