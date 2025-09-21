@@ -84,20 +84,33 @@ export async function syncFromAsana() {
       // Subtasks with assignee and followers
       const subs: AsanaSubtask[] = await paginate<AsanaSubtask>(client, `/tasks/${t.gid}/subtasks`, { params: { opt_fields: "name,completed,created_at,completed_at,assignee,followers" } });
       for (const st of subs) {
+        // Only set assignee_gid if the assignee exists in our assignees table.
+        let assigneeToSet: string | null = null;
+        if (st.assignee?.gid) {
+          const existing = await prisma.assignees.findUnique({ where: { assignee_gid: st.assignee.gid } as any }).catch(() => null);
+          if (existing) assigneeToSet = st.assignee.gid;
+        }
+
         await prisma.subtasks.create({
           data: {
             gid: st.gid,
             name: st.name ?? null,
             parent_task_gid: t.gid,
-            assignee_gid: st.assignee?.gid ?? null,
+            assignee_gid: assigneeToSet,
             completed: st.completed ?? null,
             created_at: st.created_at ? new Date(st.created_at) : null,
             completed_at: st.completed_at ? new Date(st.completed_at) : null,
           },
         });
+
+        // Only create follower links for followers that already exist in our assignees table.
         if (st.followers?.length) {
           for (const f of st.followers) {
-            await prisma.task_followers.create({ data: { task_gid: st.gid, follower_gid: f.gid } });
+            if (!f.gid) continue;
+            const followerExists = await prisma.assignees.findUnique({ where: { assignee_gid: f.gid } as any }).catch(() => null);
+            if (followerExists) {
+              await prisma.task_followers.create({ data: { task_gid: st.gid, follower_gid: f.gid } });
+            }
           }
         }
       }
