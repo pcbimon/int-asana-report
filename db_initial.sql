@@ -1,4 +1,4 @@
-create table public.assignees
+create table assignees
 (
     email        text not null
         constraint assignees_pk
@@ -10,10 +10,10 @@ create table public.assignees
             unique
 );
 
-alter table public.assignees
+alter table assignees
     owner to asana;
 
-create table public.sections
+create table sections
 (
     gid  text not null
         constraint sections_pk
@@ -21,10 +21,10 @@ create table public.sections
     name text not null
 );
 
-alter table public.sections
+alter table sections
     owner to asana;
 
-create table public.tasks
+create table tasks
 (
     gid          text not null
         constraint tasks_pk
@@ -32,7 +32,7 @@ create table public.tasks
     name         text,
     section_gid  text
         constraint tasks_sections_gid_fk
-            references public.sections,
+            references sections,
     completed    boolean,
     completed_at timestamp with time zone,
     due_on       date,
@@ -40,10 +40,10 @@ create table public.tasks
     created_at   timestamp with time zone
 );
 
-alter table public.tasks
+alter table tasks
     owner to asana;
 
-create table public.subtasks
+create table subtasks
 (
     gid             text not null
         constraint subtasks_pk
@@ -51,40 +51,43 @@ create table public.subtasks
     name            text,
     parent_task_gid text
         constraint subtasks_tasks_gid_fk
-            references public.tasks,
+            references tasks,
     assignee_gid    text
         constraint subtasks_assignees_assignee_gid_fk
-            references public.assignees (assignee_gid),
+            references assignees (assignee_gid),
     completed       boolean,
     created_at      timestamp with time zone,
     completed_at    timestamp with time zone
 );
 
-alter table public.subtasks
+alter table subtasks
     owner to asana;
 
-create table public.sync_metadata
+create table sync_metadata
 (
-    key        text,
+    key        text not null
+        constraint sync_metadata_pk
+            primary key,
     message    text,
     updated_at timestamp with time zone
 );
 
-alter table public.sync_metadata
+alter table sync_metadata
     owner to asana;
 
-create table public.task_followers
+create table task_followers
 (
-    task_gid     text
+    task_gid     text not null
         constraint task_followers_subtasks_gid_fk
-            references public.subtasks,
-    follower_gid text
+            references subtasks,
+    follower_gid text not null
         constraint task_followers_assignees_assignee_gid_fk
-            references public.assignees (assignee_gid),
+            references assignees (assignee_gid),
     constraint task_followers_pk
-        unique (task_gid, follower_gid)
+        unique (follower_gid, task_gid)
 );
 
-alter table public.task_followers
+alter table task_followers
     owner to asana;
+
 
