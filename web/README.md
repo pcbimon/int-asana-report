@@ -46,7 +46,7 @@
 3. Summary Metric Cards (ref: components/SummaryMetricCards.tsx)
    - แสดงข้อมูลสรุป เช่น จำนวนงานทั้งหมด, งานที่เสร็จแล้ว,  งานที่เกินกำหนด, ร้อยละงานที่เสร็จแล้ว
 4. Weekly Summary Chart(ref: components/WeeklySummaryChart.tsx)
-   - กราฟแสดงสรุปงานรายสัปดาห์ โดยแยกตามสถานะงาน (Assigned, Completed, Overdue,Collab,Expected(เป็นค่าคงที่ที่กำหนดจาก ENV REPORT_EXPECTED_TASKS_PER_WEEK=3))
+   - กราฟแสดงสรุปงานรายสัปดาห์ โดยแยกตามสถานะงาน (Assigned, Completed, Overdue,Collab(แทนด้วย Followers),Expected(เป็นค่าคงที่ที่กำหนดจาก ENV REPORT_EXPECTED_TASKS_PER_WEEK=3))
 5. Current Tasks Table (ref: components/CurrentTasksTable.tsx)
     - ตารางแสดงรายการงานปัจจุบัน โดยมีคอลัมน์ดังนี้:
         - Task Name: ชื่อเรื่องของงาน
