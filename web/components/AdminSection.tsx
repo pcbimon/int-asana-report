@@ -19,12 +19,12 @@ import {
 } from "@/components/ui/popover";
 
 export default function AdminSection() {
-  const assignees = [
-    { name: "Alice", value: "123456" },
-    { name: "Bob", value: "234567" },
-    { name: "Charlie", value: "345678" },
-    { name: "David", value: "456789" },
-  ];
+  const [assignees, setAssignees] = React.useState<{ name: string; value: string }[]>([]);
+  React.useEffect(() => {
+    fetch('/api/assignees').then(r => r.json()).then((data) => {
+      setAssignees(data.map((a: any) => ({ name: `${a.firstname} ${a.lastname}`.trim(), value: a.assignee_gid })));
+    }).catch(() => {});
+  }, []);
   const [open, setOpen] = React.useState(false);
   const [value, setValue] = React.useState("");
   const selectedAssignee = assignees.find(
@@ -51,7 +51,7 @@ export default function AdminSection() {
           </PopoverTrigger>
           <PopoverContent className="w-[200px] p-0">
             <Command>
-              <CommandInput placeholder="Search framework..." className="h-9" />
+              <CommandInput placeholder="Search assignee..." className="h-9" />
               <CommandList>
                 <CommandEmpty>No assignee found.</CommandEmpty>
                 <CommandGroup>
@@ -62,6 +62,10 @@ export default function AdminSection() {
                       onSelect={(currentValue) => {
                         setValue(currentValue === value ? "" : currentValue);
                         setOpen(false);
+                        const picked = assignees.find(a => a.name === currentValue);
+                        if (picked?.value) {
+                          window.location.href = `/dashboard/${picked.value}`;
+                        }
                       }}
                     >
                       {assignee.name}

@@ -8,7 +8,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-export default function SummaryMetricCard() {
+
+type Props = {
+  total: number;
+  completed: number;
+  overdue: number;
+  completionRate: number; // percent
+};
+
+export default function SummaryMetricCard({ total, completed, overdue, completionRate }: Props) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 my-8">
       <Card>
@@ -21,7 +29,7 @@ export default function SummaryMetricCard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold">42</div>
+          <div className="text-3xl font-bold">{total}</div>
           <CardDescription className="text-xs text-gray-500">
             Number of tasks assigned
           </CardDescription>
@@ -37,7 +45,7 @@ export default function SummaryMetricCard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold">42</div>
+          <div className="text-3xl font-bold">{completed}</div>
           <CardDescription className="text-xs text-gray-500">
             Completed subtasks
           </CardDescription>
@@ -53,7 +61,7 @@ export default function SummaryMetricCard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold">100%</div>
+          <div className="text-3xl font-bold">{completionRate}%</div>
           <CardDescription className="text-xs text-gray-500">
             Percentage completed
           </CardDescription>
@@ -69,7 +77,7 @@ export default function SummaryMetricCard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold">0</div>
+          <div className="text-3xl font-bold">{overdue}</div>
           <CardDescription className="text-xs text-gray-500">
             Overdue subtasks
           </CardDescription>

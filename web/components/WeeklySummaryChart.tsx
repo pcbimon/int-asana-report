@@ -5,7 +5,9 @@ import {
     CardContent,
 } from "@/components/ui/card";
 import ReactECharts from 'echarts-for-react';
-export default function WeeklySummaryChart() {
+import { WeeklyPoint } from "@/lib/types";
+
+export default function WeeklySummaryChart({ data }: { data: WeeklyPoint[] }) {
     return (
         <Card>
             <CardContent>
@@ -22,7 +24,7 @@ export default function WeeklySummaryChart() {
                     grid: { top: 60, left: 40, right: 20, bottom: 40 },
                     xAxis: {
                         type: 'category',
-                        data: ['12 May 2025', '13 May 2025', '14 May 2025', '15 May 2025', '16 May 2025', '17 May 2025', '18 May 2025']
+                        data: data.map(d => d.week)
                     },
                     yAxis: {
                         type: 'value',
@@ -39,7 +41,7 @@ export default function WeeklySummaryChart() {
                             lineStyle: { type: 'solid', color: '#3498db' }, // blue solid (assigned)
                             itemStyle: { color: '#2980b9' },
                             areaStyle: { color: 'rgba(52, 152, 219, 0.12)' },
-                            data: [1,2,3,1,2,0,4]
+                            data: data.map(d => d.assigned)
                         },
                         {
                             name: 'Completed',
@@ -52,14 +54,14 @@ export default function WeeklySummaryChart() {
                             },
                             itemStyle: { color: '#27ae60' },
                             areaStyle: { color: 'rgba(46, 204, 113, 0.12)' },
-                            data: [0,1,2,1,3,1,2]
+                            data: data.map(d => d.completed)
                         },
                         {
                             name: 'Overdue',
                             type: 'bar',
                             barWidth: '40%',
                             itemStyle: { color: '#e74c3c' }, // red
-                            data: [0,0,1,0,0,2,0]
+                            data: data.map(d => d.overdue)
                         },
                         {
                             name: 'Collab',
@@ -68,7 +70,7 @@ export default function WeeklySummaryChart() {
                             smooth: true,
                             lineStyle: { type: 'dashed', color: '#8e44ad' }, // purple dashed (collab)
                             itemStyle: { color: '#8e44ad' },
-                            data: [1,1,1,2,1,1,3]
+                            data: data.map(d => d.collab)
                         },
                         {
                             name: 'Expected',
@@ -77,7 +79,7 @@ export default function WeeklySummaryChart() {
                             smooth: true,
                             lineStyle: { type: 'dotted', color: '#f1c40f' }, // yellow dotted
                             itemStyle: { color: '#f1c40f' },
-                            data: [3,3,3,3,3,3,3]
+                            data: data.map(d => d.expected)
                         }
                     ]
                 }} />
