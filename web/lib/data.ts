@@ -97,6 +97,8 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
         expected,
         due_on: t.due_on ?? null,
         completedFlag: !!t.completed,
+        // keep raw week_startdate for stable sorting (may be null)
+        _week_startdate: t.week_startdate ?? null,
       },
     ])
   );
@@ -116,12 +118,24 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
     }
   }
 
-  const result: WeeklyPoint[] = [];
+  const result: (WeeklyPoint & { _week_startdate?: string | null })[] = [];
   for (const [gid, v] of byTask) {
     if (v.assigned + v.collab + v.completed + v.overdue === 0) continue; // skip empty
-    result.push({ week: v.label, assigned: v.assigned, completed: v.completed, overdue: v.overdue, collab: v.collab, expected: v.expected });
+  result.push({ week: v.label, assigned: v.assigned, completed: v.completed, overdue: v.overdue, collab: v.collab, expected: v.expected, _week_startdate: v._week_startdate ? new Date(v._week_startdate).toISOString() : null });
   }
-  return result;
+  // Sort by week_startdate newest-first. Items without week_startdate go last, sorted by label as a fallback.
+  result.sort((a, b) => {
+    const aDate = a._week_startdate ? new Date(a._week_startdate).getTime() : null;
+    const bDate = b._week_startdate ? new Date(b._week_startdate).getTime() : null;
+    if (aDate && bDate) return bDate - aDate; // newest first
+    if (aDate && !bDate) return -1; // a has date -> comes before
+    if (!aDate && bDate) return 1; // b has date -> comes before
+    // both null -> fallback to label descending
+    return b.week.localeCompare(a.week);
+  });
+
+  // Clean up internal sort key before returning
+  return result.map(({ _week_startdate, ...rest }) => rest as WeeklyPoint);
 }
 
 export async function getCurrentTasks(
