@@ -203,11 +203,14 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
                   <PaginationItem>
                     <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); onChangePage(Math.max(1, page - 1)); }} />
                   </PaginationItem>
-                  {Array.from({ length: totalPages }).map((_, i) => (
-                    <PaginationItem key={i}>
-                      <PaginationLink href="#" isActive={i + 1 === page} onClick={(e) => { e.preventDefault(); onChangePage(i + 1); }}>{i + 1}</PaginationLink>
-                    </PaginationItem>
-                  ))}
+                  {/* numeric page links hidden on small screens */}
+                  <div className="hidden sm:flex items-center space-x-1">
+                    {Array.from({ length: totalPages }).map((_, i) => (
+                      <PaginationItem key={i}>
+                        <PaginationLink href="#" isActive={i + 1 === page} onClick={(e) => { e.preventDefault(); onChangePage(i + 1); }}>{i + 1}</PaginationLink>
+                      </PaginationItem>
+                    ))}
+                  </div>
                   <PaginationItem>
                     <PaginationNext href="#" onClick={(e) => { e.preventDefault(); onChangePage(Math.min(totalPages, page + 1)); }} />
                   </PaginationItem>
