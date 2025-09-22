@@ -243,7 +243,15 @@ export async function getCurrentTasks(
       tasks: { select: { gid: true, name: true, due_on: true, week_startdate: true } },
       task_followers: { select: { follower_gid: true } },
     },
-    orderBy: { tasks: { week_startdate: "desc" } },
+    // Order by parent task week_startdate (desc) first, then by completion (completed first).
+    // To approximate Overdue before Pending within incomplete tasks, order by tasks.due_on asc
+    // so past dates (overdue) come before future dates. This gives a nested sort coming
+    // from the DB and avoids needing an in-memory status sort.
+    orderBy: [
+      { tasks: { week_startdate: "desc" } },
+      { completed: "desc" },
+      { tasks: { due_on: "asc" } },
+    ],
     skip: start,
     take: pageSize,
   });
@@ -265,8 +273,6 @@ export async function getCurrentTasks(
     };
   }).filter((r) => (status === 'all' ? true : r.status.toLowerCase() === status));
 
-  // Sort the mapped page by status rank to preserve previous ordering
-  mapped.sort((a, b) => statusRank[a.status] - statusRank[b.status]);
 
   return { rows: mapped, total, pageSize };
 }
