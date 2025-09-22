@@ -19,9 +19,12 @@ export default function WeeklySummaryChart({ data }: { data: WeeklyPoint[] }) {
                         trigger: 'axis'
                     },
                     legend: {
-                        data: ['Assigned','Completed','Overdue','Collab','Expected']
+                        data: ['Assigned','Completed','Overdue','Collab','Expected'],
+                        bottom: 0,
+                        left: 'center',
+                        orient: 'horizontal'
                     },
-                    grid: { top: 60, left: 40, right: 20, bottom: 40 },
+                    // grid: { top: 60, left: 40, right: 20, bottom: 40 },
                     xAxis: {
                         type: 'category',
                         data: data.map(d => d.week)
