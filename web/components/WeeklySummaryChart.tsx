@@ -24,7 +24,7 @@ export default function WeeklySummaryChart({ data }: { data: WeeklyPoint[] }) {
                         left: 'center',
                         orient: 'horizontal'
                     },
-                    // grid: { top: 60, left: 40, right: 20, bottom: 40 },
+                    grid: { top: 60, left: 40, right: 20, bottom: 50 },
                     xAxis: {
                         type: 'category',
                         data: data.map(d => d.week)
