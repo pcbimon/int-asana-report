@@ -66,86 +66,77 @@ export async function getSummaryMetrics(assigneeGid: string) {
 }
 
 export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint[]> {
-  // Group by parent task (which encodes the week) and count subtasks
-  const tasks = await prisma.tasks.findMany({
-    select: { gid: true, name: true, due_on: true, completed: true, week_startdate: true },
-    orderBy: { week_startdate: "asc" },
-  });
-
+  // Use subtasks as the primary source and join to parent tasks for week_startdate/due_on
   const expected = Number(process.env.REPORT_EXPECTED_TASKS_PER_WEEK ?? 3);
 
-  // Fetch tasks but include only the subtasks related to this assignee (owner or follower)
-  // so we can process everything in a single query. This reduces transferred rows and
-  // avoids a separate global subtasks query.
-  const tasksWithSubtasks = await prisma.tasks.findMany({
-    where: {},
+  // Fetch subtasks where the user is owner OR a follower, include parent task info and followers
+  const subtaskRows = await prisma.subtasks.findMany({
+    where: {
+      OR: [
+        { assignee_gid: assigneeGid },
+        { task_followers: { some: { follower_gid: assigneeGid } } },
+      ],
+    },
     select: {
       gid: true,
-      name: true,
-      due_on: true,
+      assignee_gid: true,
       completed: true,
-      week_startdate: true,
-      subtasks: {
-        where: {
-          OR: [
-            { assignee_gid: assigneeGid },
-            { task_followers: { some: { follower_gid: assigneeGid } } },
-          ],
-        },
-        select: {
-          gid: true,
-          assignee_gid: true,
-          completed: true,
-          task_followers: { select: { follower_gid: true } },
-        },
-      },
+      due_on: true,
+      tasks: { select: { gid: true, name: true, week_startdate: true, due_on: true } },
+      task_followers: { select: { follower_gid: true } },
     },
-    orderBy: { week_startdate: "asc" },
+    orderBy: { tasks: { week_startdate: "asc" } },
   });
 
-  const byTask = new Map(
-    tasksWithSubtasks.map((t) => [
-      t.gid,
-      {
-        // Prefer week_startdate (if present) formatted for display, otherwise fall back to task name
-        label: t.week_startdate ? dayjs(t.week_startdate).format("DD MMM YYYY") : t.name ?? "No Week",
-        assigned: 0,
-        completed: 0,
-        overdue: 0,
-        collab: 0,
-        expected,
-        due_on: t.due_on ?? null,
-        completedFlag: !!t.completed,
-        _week_startdate: t.week_startdate,
-      },
-    ])
-  );
-
+  // Aggregate counts keyed by week_startdate string (or task name fallback)
+  type Agg = { label: string; assigned: number; completed: number; overdue: number; collab: number; expected: number; _week_startdate?: string | null; };
+  const byWeek = new Map<string, Agg>();
   const today = new Date();
 
-  for (const t of tasksWithSubtasks) {
-    const bucket = byTask.get(t.gid);
-    if (!bucket) continue;
-    for (const st of t.subtasks ?? []) {
-      const isOwner = st.assignee_gid === assigneeGid;
-      const isFollower = (st.task_followers ?? []).some((f) => f.follower_gid === assigneeGid);
-      if (!isOwner && !isFollower) continue;
-      if (isOwner) bucket.assigned += 1;
-      if (isFollower) bucket.collab += 1;
-      if ((isOwner || isFollower) && st.completed) bucket.completed += 1;
-      if ((isOwner || isFollower) && !st.completed) {
-        if (bucket.due_on && bucket.due_on < today) bucket.overdue += 1;
+  for (const st of subtaskRows) {
+    const isOwner = st.assignee_gid === assigneeGid;
+    const isFollower = (st.task_followers ?? []).some((f) => f.follower_gid === assigneeGid);
+    if (!isOwner && !isFollower) continue;
+
+    const weekKeyRaw = st.tasks?.week_startdate ?? st.tasks?.name ?? "No Week";
+    const weekKey = weekKeyRaw ? new Date(weekKeyRaw).toISOString() : "No Week";
+    const label = st.tasks?.week_startdate ? dayjs(st.tasks.week_startdate).format("DD MMM YYYY") : st.tasks?.name ?? "No Week";
+
+    if (!byWeek.has(weekKey)) {
+      byWeek.set(weekKey, { label, assigned: 0, completed: 0, overdue: 0, collab: 0, expected, _week_startdate: st.tasks?.week_startdate ? new Date(st.tasks.week_startdate).toISOString() : null });
+    }
+
+    const agg = byWeek.get(weekKey)!;
+    if (isOwner) agg.assigned += 1;
+    if (isFollower) agg.collab += 1;
+    if ((isOwner || isFollower) && st.completed) agg.completed += 1;
+    if ((isOwner || isFollower) && !st.completed) {
+      const dueRaw = st.due_on;
+      if (dueRaw) {
+        const dueDate = new Date(dueRaw);
+        const cutoff = new Date(new Date().toDateString()); // midnight today
+        if (dueDate < cutoff) agg.overdue += 1;
       }
     }
   }
 
   const result: (WeeklyPoint & { _week_startdate?: string | null })[] = [];
-  for (const [gid, v] of byTask) {
-    if (v.assigned + v.collab + v.completed + v.overdue === 0) continue; // skip empty
+  for (const [k, v] of byWeek) {
+    if (v.assigned + v.collab + v.completed + v.overdue === 0) continue;
     result.push({ week: v.label, assigned: v.assigned, completed: v.completed, overdue: v.overdue, collab: v.collab, expected: v.expected, _week_startdate: v._week_startdate ? new Date(v._week_startdate).toISOString() : null });
   }
 
-  // Clean up internal sort key before returning
+  // Sort by _week_startdate ascending (nulls go last)
+  result.sort((a, b) => {
+    const aDate = (a as any)._week_startdate ? new Date((a as any)._week_startdate) : null;
+    const bDate = (b as any)._week_startdate ? new Date((b as any)._week_startdate) : null;
+    if (aDate && bDate) return aDate.getTime() - bDate.getTime();
+    if (aDate) return -1;
+    if (bDate) return 1;
+    return 0;
+  });
+
+  // Remove internal sort key before returning
   return result.map(({ _week_startdate, ...rest }) => rest as WeeklyPoint);
 }
 
