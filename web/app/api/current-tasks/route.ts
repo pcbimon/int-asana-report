@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentTasks } from "@/lib/data";
+import type { StatusFilter } from "@/lib/types";
 
-export async function GET(req: NextRequest, context: { params: any }) {
+export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const status = (url.searchParams.get("status") ?? "all").toLowerCase();
@@ -14,9 +15,10 @@ export async function GET(req: NextRequest, context: { params: any }) {
       return NextResponse.json({ ok: false, error: "missing required query param 'assignee'" }, { status: 400 });
     }
 
-    const result = await getCurrentTasks(assignee, { status: status as any, page, pageSize });
+    const result = await getCurrentTasks(assignee, { status: status as StatusFilter, page, pageSize });
     return NextResponse.json(result);
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

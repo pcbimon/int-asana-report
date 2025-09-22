@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MdOutlineAccessTime } from "react-icons/md";
@@ -25,19 +25,19 @@ import {
   PaginationPrevious,
 } from "./ui/pagination";
 import { CurrentTaskRow, StatusFilter } from "@/lib/types";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 type Props = {
   assigneeGid: string;
 };
 
 export default function CurrentTasksTable({ assigneeGid }: Props) {
-  const router = useRouter();
-  const pathname = usePathname();
+  // const router = useRouter();
+  // const pathname = usePathname();
   const sp = useSearchParams();
 
-  const initialStatus = (sp?.get("status") ?? "all") as StatusFilter;
-  const initialPage = Number(sp?.get("page") ?? 1);
+  const initialStatus = useMemo(() => (sp?.get("status") ?? "all") as StatusFilter, [sp]);
+  const initialPage = useMemo(() => Number(sp?.get("page") ?? 1), [sp]);
 
   const [status, setStatus] = useState<StatusFilter>(initialStatus);
   const [page, setPage] = useState<number>(initialPage);
@@ -48,19 +48,20 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const buildUrl = (params: Partial<{ page: number; status: StatusFilter }>) => {
-    const usp = new URLSearchParams(sp?.toString());
-    if (params.status) usp.set("status", params.status);
-    if (params.page) usp.set("page", String(params.page));
-    if (params.page === 1) usp.delete("page");
-    const qs = usp.toString();
-    return `${pathname}${qs ? `?${qs}` : ""}`;
-  };
+  // helper kept for possible future use
+  // const buildUrl = (params: Partial<{ page: number; status: StatusFilter }>) => {
+  //   const usp = new URLSearchParams(sp?.toString());
+  //   if (params.status) usp.set("status", params.status);
+  //   if (params.page) usp.set("page", String(params.page));
+  //   if (params.page === 1) usp.delete("page");
+  //   const qs = usp.toString();
+  //   return `${pathname}${qs ? `?${qs}` : ""}`;
+  // };
 
   // request id to ignore out-of-order responses
   const reqIdRef = useRef(0);
 
-  const loadData = async (newStatus?: StatusFilter, newPage?: number) => {
+  const loadData = useCallback(async (newStatus?: StatusFilter, newPage?: number) => {
     const s = newStatus ?? status;
     const p = newPage ?? page;
 
@@ -89,13 +90,19 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
     } finally {
       if (myId === reqIdRef.current) setLoading(false);
     }
-  };
+  }, [assigneeGid, page, pageSize, status]);
 
   useEffect(() => {
-    // initial load or when assignee changes
+    // initial load or when assignee or initial params change
     loadData(initialStatus, initialPage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assigneeGid]);
+    // we intentionally rely on loadData from closure
+    // and only re-run when inputs change
+    // eslint reasoning: loadData is stable for our usage as it updates based on params passed
+    // and accesses current assigneeGid
+    // Dependencies are included to satisfy exhaustive-deps
+    //
+    // Note: useMemo above ensures initialStatus/page are stable values derived from URL
+  }, [assigneeGid, initialStatus, initialPage, loadData]);
 
   const onChangePage = (p: number) => { loadData(undefined, p); };
   const onChangeStatus = (s: StatusFilter) => { loadData(s, 1); };

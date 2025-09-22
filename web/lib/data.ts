@@ -89,9 +89,8 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
   });
 
   // Aggregate counts keyed by week_startdate string (or task name fallback)
-  type Agg = { label: string; assigned: number; completed: number; overdue: number; collab: number; expected: number; _week_startdate?: string | null; };
+  type Agg = { label: string; assigned: number; completed: number; overdue: number; collab: number; expected: number; _ws?: string | null };
   const byWeek = new Map<string, Agg>();
-  const today = new Date();
 
   for (const st of subtaskRows) {
     const isOwner = st.assignee_gid === assigneeGid;
@@ -103,7 +102,7 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
     const label = st.tasks?.week_startdate ? dayjs(st.tasks.week_startdate).format("DD MMM YYYY") : st.tasks?.name ?? "No Week";
 
     if (!byWeek.has(weekKey)) {
-      byWeek.set(weekKey, { label, assigned: 0, completed: 0, overdue: 0, collab: 0, expected, _week_startdate: st.tasks?.week_startdate ? new Date(st.tasks.week_startdate).toISOString() : null });
+      byWeek.set(weekKey, { label, assigned: 0, completed: 0, overdue: 0, collab: 0, expected, _ws: st.tasks?.week_startdate ? new Date(st.tasks.week_startdate).toISOString() : null });
     }
 
     const agg = byWeek.get(weekKey)!;
@@ -120,16 +119,17 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
     }
   }
 
-  const result: (WeeklyPoint & { _week_startdate?: string | null })[] = [];
-  for (const [k, v] of byWeek) {
+  type ExtendedPoint = WeeklyPoint & { _ws?: string | null };
+  const result: ExtendedPoint[] = [];
+  for (const [, v] of byWeek) {
     if (v.assigned + v.collab + v.completed + v.overdue === 0) continue;
-    result.push({ week: v.label, assigned: v.assigned, completed: v.completed, overdue: v.overdue, collab: v.collab, expected: v.expected, _week_startdate: v._week_startdate ? new Date(v._week_startdate).toISOString() : null });
+  result.push({ week: v.label, assigned: v.assigned, completed: v.completed, overdue: v.overdue, collab: v.collab, expected: v.expected, _ws: v._ws ? new Date(v._ws).toISOString() : null });
   }
 
   // Sort by _week_startdate ascending (nulls go last)
   result.sort((a, b) => {
-    const aDate = (a as any)._week_startdate ? new Date((a as any)._week_startdate) : null;
-    const bDate = (b as any)._week_startdate ? new Date((b as any)._week_startdate) : null;
+  const aDate = a._ws ? new Date(a._ws) : null;
+  const bDate = b._ws ? new Date(b._ws) : null;
     if (aDate && bDate) return aDate.getTime() - bDate.getTime();
     if (aDate) return -1;
     if (bDate) return 1;
@@ -137,7 +137,11 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
   });
 
   // Remove internal sort key before returning
-  return result.map(({ _week_startdate, ...rest }) => rest as WeeklyPoint);
+  return result.map((p) => {
+    const { _ws, ...rest } = p;
+    void _ws; // omit internal field without triggering unused-var
+    return rest as WeeklyPoint;
+  });
 }
 
 export async function getCurrentTasks(
@@ -154,7 +158,7 @@ export async function getCurrentTasks(
   const followerWhere = { task_followers: { some: { follower_gid: assigneeGid } } };
 
   // Build base where depending on status filter
-  const statusFilterWhere: any = {};
+  const statusFilterWhere: { completed?: boolean; tasks?: { due_on?: { lt: Date } } } = {};
   if (status !== "all") {
     if (status === "completed") {
       statusFilterWhere.completed = true;
@@ -184,7 +188,9 @@ export async function getCurrentTasks(
   // When fetching rows, include the same status filter so DB pagination and
   // ordering only return matching rows. We need to merge the owner/follower
   // clauses with the statusFilterWhere appropriately.
-  const dbWhere: any = {
+  const dbWhere: {
+    OR: Array<{ AND: Array<Record<string, unknown>> }>;
+  } = {
     OR: [
       { AND: [ownerWhere, statusFilterWhere] },
       { AND: [followerWhere, statusFilterWhere] },
@@ -220,10 +226,10 @@ export async function getCurrentTasks(
   // combining tasks.due_on and completed is easier in JS for formatting consistency)
   const mapped: CurrentTaskRow[] = dbRows.map((st) => {
     const followers = (st.task_followers ?? []).map((f) => {
-      const a = (f as any).assignees;
+      const a = f.assignees;
       return { gid: f.follower_gid, first_name: a?.firstname ?? "", last_name: a?.lastname ?? "" };
     });
-  const isFollower = followers.some((f) => f.gid === assigneeGid);
+    const isFollower = followers.some((f) => f.gid === assigneeGid);
     const type: CurrentTaskRow['type'] = st.assignee_gid === assigneeGid ? 'Owner' : isFollower ? 'Collaborator' : 'Owner';
     // Compute status: prefer subtask.due_on but fall back to parent task due_on
     const effectiveDue = st.due_on ?? st.tasks?.due_on ?? null;

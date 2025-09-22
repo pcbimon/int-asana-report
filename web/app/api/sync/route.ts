@@ -5,7 +5,8 @@ export async function POST() {
   try {
     const result = await syncFromAsana();
     return NextResponse.json({ ok: true, result });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

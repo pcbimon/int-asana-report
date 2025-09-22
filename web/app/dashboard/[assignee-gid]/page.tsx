@@ -12,9 +12,7 @@ import { getAssigneeByGid, getLastSync, getSummaryMetrics, getWeeklySummary, get
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage({ params }: { params: { "assignee-gid": string } }) {
-  // next/app router may provide async params; await to satisfy Next.js sync-dynamic-apis rule
-  const awaitedParams = await params as { "assignee-gid": string };
-  const assigneeGid = awaitedParams["assignee-gid"];
+  const assigneeGid = params["assignee-gid"];
   if (!assigneeGid) redirect("/");
 
   const [metrics, weekly, lastSync, assignee] = await Promise.all([
@@ -26,7 +24,7 @@ export default async function DashboardPage({ params }: { params: { "assignee-gi
 
   // fetch assignees server-side and format for the AdminSection
   const rawAssignees = await getAssignees();
-  const assigneeOptions = rawAssignees.map((a: any) => ({ name: `${a.firstname} ${a.lastname}`.trim(), value: a.assignee_gid }));
+  const assigneeOptions = rawAssignees.map((a) => ({ name: `${a.firstname} ${a.lastname}`.trim(), value: a.assignee_gid! }));
 
   const showAdmin = process.env.NEXT_PUBLIC_SHOW_ADMIN === '1';
 
