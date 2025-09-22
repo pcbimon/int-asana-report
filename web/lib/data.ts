@@ -83,7 +83,7 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
       completed: true,
       due_on: true,
       tasks: { select: { gid: true, name: true, week_startdate: true, due_on: true } },
-      task_followers: { select: { follower_gid: true } },
+  task_followers: { select: { follower_gid: true, assignees: { select: { firstname: true, lastname: true } } } },
     },
     orderBy: { tasks: { week_startdate: "asc" } },
   });
@@ -201,7 +201,7 @@ export async function getCurrentTasks(
       created_at: true,
       due_on: true,
       tasks: { select: { gid: true, name: true, due_on: true, week_startdate: true } },
-      task_followers: { select: { follower_gid: true } },
+      task_followers: { select: { follower_gid: true, assignees: { select: { firstname: true, lastname: true } } } },
     },
     // Order by parent task week_startdate (desc) first, then by completion (completed first).
     // To approximate Overdue before Pending within incomplete tasks, order by tasks.due_on asc
@@ -219,7 +219,11 @@ export async function getCurrentTasks(
   // Map DB rows to CurrentTaskRow[] and apply status filter (since complex overdue logic
   // combining tasks.due_on and completed is easier in JS for formatting consistency)
   const mapped: CurrentTaskRow[] = dbRows.map((st) => {
-    const isFollower = (st.task_followers ?? []).some((f) => f.follower_gid === assigneeGid);
+    const followers = (st.task_followers ?? []).map((f) => {
+      const a = (f as any).assignees;
+      return { gid: f.follower_gid, first_name: a?.firstname ?? "", last_name: a?.lastname ?? "" };
+    });
+  const isFollower = followers.some((f) => f.gid === assigneeGid);
     const type: CurrentTaskRow['type'] = st.assignee_gid === assigneeGid ? 'Owner' : isFollower ? 'Collaborator' : 'Owner';
     // Compute status: prefer subtask.due_on but fall back to parent task due_on
     const effectiveDue = st.due_on ?? st.tasks?.due_on ?? null;
@@ -232,6 +236,7 @@ export async function getCurrentTasks(
       due_on: st.due_on ? dayjs(st.due_on).format("DD MMM YYYY") : null,
       status: statusStr,
       type,
+      followers,
     };
   }).filter((r) => (status === 'all' ? true : r.status.toLowerCase() === status));
 

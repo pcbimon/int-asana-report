@@ -10,5 +10,10 @@ export type CurrentTaskRow = {
   due_on: string | null;
   status: "Pending" | "Completed" | "Overdue";
   type: "Owner" | "Collaborator";
-  followers?: string[];
+  followers?: Follower[];
+};
+export type Follower = {
+  gid: string;
+  first_name: string;
+  last_name: string;
 };

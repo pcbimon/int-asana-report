@@ -166,6 +166,11 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
                       <TableCell className="font-medium">
                         <div className="flex flex-col">
                           <span className="font-medium">{r.name}</span>
+                          {r.followers && r.followers.length > 0 && (
+                            <span className="text-sm text-gray-500">
+                              Collaborators: {r.followers.map(f => `${f.first_name} ${f.last_name}`).join(", ")}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>{r.week || '-'}</TableCell>
