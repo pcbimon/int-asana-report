@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Disable ESLint during build to avoid failing the build for lint-only issues.
+  // This is intentional per user's request; re-enable when ready to enforce lint.
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;
