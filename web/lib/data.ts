@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import dayjs from "dayjs";
 import type { StatusFilter, WeeklyPoint, CurrentTaskRow } from "@/lib/types";
 
 export async function getAssignees() {
@@ -132,72 +133,6 @@ export async function getCurrentTasks(
   opts: { status?: StatusFilter; page?: number; pageSize?: number } = {}
 ) {
   const { status = "all", page = 1, pageSize = 10 } = opts;
-
-  // Get subtasks where this user is owner or follower
-  const [owned, followerLinks] = await Promise.all([
-    prisma.subtasks.findMany({
-      where: { assignee_gid: assigneeGid },
-      select: {
-        gid: true,
-        name: true,
-        assignee_gid: true,
-        completed: true,
-        created_at: true,
-        tasks: { select: { gid: true, name: true, due_on: true, week_startdate: true } },
-      },
-      orderBy: { tasks: { week_startdate: "desc" } },
-    }),
-    prisma.task_followers.findMany({
-      where: { follower_gid: assigneeGid },
-      select: {
-        subtasks: {
-          select: {
-            gid: true,
-            name: true,
-            assignee_gid: true,
-            completed: true,
-            created_at: true,
-            tasks: { select: { gid: true, name: true, due_on: true, week_startdate: true } },
-          },
-        },
-      },
-      orderBy: { subtasks: { tasks: { week_startdate: "desc" } } },
-    }),
-  ]);
-
-  // Normalize follower links to the same shape as `owned`
-  const followedSubtasks = followerLinks.flatMap((f) => (f.subtasks ? [f.subtasks] : [])) as typeof owned;
-
-  // Build rows
-  const allRows: CurrentTaskRow[] = [];
-
-  const pushRow = (st: typeof owned[number], type: CurrentTaskRow["type"]) => {
-    const statusStr = computeStatus({ completed: st.completed ?? false, due_on: st.tasks?.due_on ?? null });
-    allRows.push({
-      gid: st.gid,
-      name: st.name ?? "",
-      week: st.tasks?.week_startdate ? new Date(st.tasks.week_startdate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : st.tasks?.name ?? "",
-      created_at: st.created_at ?? null,
-      due_on: st.tasks?.due_on ?? null,
-      status: statusStr,
-      type,
-    });
-  };
-
-  owned.forEach((st) => pushRow(st, "Owner"));
-  followedSubtasks.forEach((st) => pushRow(st, "Collaborator"));
-
-  // Filter by status
-  const filtered = allRows.filter((r) =>
-    status === "all" ? true : r.status.toLowerCase() === status
-  );
-  // Sort: status order Completed, Overdue, Pending
-  const statusRank: Record<CurrentTaskRow["status"], number> = {
-    Completed: 0,
-    Overdue: 1,
-    Pending: 2,
-  };
-
   // Instead of doing pagination in-memory, perform DB-level pagination.
   // We'll compute total count from filtered rows and then fetch a page using
   // offset/limit. To do that efficiently we need minimal fields from DB and
@@ -261,13 +196,13 @@ export async function getCurrentTasks(
   const mapped: CurrentTaskRow[] = dbRows.map((st) => {
     const isFollower = (st.task_followers ?? []).some((f) => f.follower_gid === assigneeGid);
     const type: CurrentTaskRow['type'] = st.assignee_gid === assigneeGid ? 'Owner' : isFollower ? 'Collaborator' : 'Owner';
-    const statusStr = computeStatus({ completed: st.completed ?? false, due_on: st.tasks?.due_on ?? null });
+    const statusStr = computeStatus({ completed: st.completed ?? false, due_on: st.due_on ?? null });
     return {
       gid: st.gid,
       name: st.name ?? "",
-      week: st.tasks?.week_startdate ? new Date(st.tasks.week_startdate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : st.tasks?.name ?? "",
-      created_at: st.created_at ?? null,
-      due_on: st.tasks?.due_on ?? null,
+      week: st.tasks?.week_startdate ? dayjs(st.tasks.week_startdate).format("DD MMM YYYY") : null,
+      created_at: st.created_at ? dayjs(st.created_at).format("DD MMM YYYY") : null,
+      due_on: st.due_on ? dayjs(st.due_on).format("DD MMM YYYY") : null,
       status: statusStr,
       type,
     };
@@ -276,3 +211,4 @@ export async function getCurrentTasks(
 
   return { rows: mapped, total, pageSize };
 }
+

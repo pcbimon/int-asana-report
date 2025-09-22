@@ -5,9 +5,9 @@ export type WeeklyPoint = { week: string; assigned: number; completed: number; o
 export type CurrentTaskRow = {
   gid: string;
   name: string;
-  week: string;
-  created_at: Date | null;
-  due_on: Date | null;
+  week: string | null;
+  created_at: string | null;
+  due_on: string | null;
   status: "Pending" | "Completed" | "Overdue";
   type: "Owner" | "Collaborator";
   followers?: string[];

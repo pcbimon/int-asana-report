@@ -146,7 +146,7 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
                     </div>
                   </TableCell>
                   <TableCell>{r.week || '-'}</TableCell>
-                  <TableCell>{r.due_on ? new Date(r.due_on).toLocaleDateString() : '-'}</TableCell>
+                  <TableCell>{r.due_on || '-'}</TableCell>
                   <TableCell>
                     {r.status === 'Completed' && (
                       <Badge variant="success">
