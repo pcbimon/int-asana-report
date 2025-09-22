@@ -27,6 +27,8 @@ export default function AdminSection() {
   }, []);
   const [open, setOpen] = React.useState(false);
   const [value, setValue] = React.useState("");
+  // use a stable id so Radix-generated ids don't mismatch between server and client
+  const id = React.useId();
   const selectedAssignee = assignees.find(
     (assignee) => assignee.value === value
   );
@@ -37,9 +39,11 @@ export default function AdminSection() {
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button
+              id={id}
               variant="outline"
               role="combobox"
               aria-expanded={open}
+              aria-controls={`${id}-content`}
               className="w-[200px] justify-between"
             >
               {value
@@ -49,7 +53,7 @@ export default function AdminSection() {
               <ChevronsUpDown className="opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[200px] p-0">
+          <PopoverContent id={`${id}-content`} className="w-[200px] p-0">
             <Command>
               <CommandInput placeholder="Search assignee..." className="h-9" />
               <CommandList>
