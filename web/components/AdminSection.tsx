@@ -18,20 +18,24 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export default function AdminSection() {
-  const [assignees, setAssignees] = React.useState<{ name: string; value: string }[]>([]);
-  React.useEffect(() => {
-    fetch('/api/assignees').then(r => r.json()).then((data) => {
-      setAssignees(data.map((a: any) => ({ name: `${a.firstname} ${a.lastname}`.trim(), value: a.assignee_gid })));
-    }).catch(() => {});
-  }, []);
+export type AssigneeOption = { name: string; value: string };
+
+export default function AdminSection({
+  assignees,
+  activeAssigneeGid,
+}: {
+  assignees: AssigneeOption[];
+  activeAssigneeGid?: string | null;
+}) {
   const [open, setOpen] = React.useState(false);
-  const [value, setValue] = React.useState("");
+  const [value, setValue] = React.useState(activeAssigneeGid ?? "");
   // use a stable id so Radix-generated ids don't mismatch between server and client
   const id = React.useId();
-  const selectedAssignee = assignees.find(
-    (assignee) => assignee.value === value
-  );
+  const selectedAssignee = assignees.find((assignee) => assignee.value === value);
+  React.useEffect(() => {
+    setValue(activeAssigneeGid ?? "");
+  }, [activeAssigneeGid]);
+
   return (
     <div className="my-4">
       <div className="flex space-x-2 items-center">
@@ -59,30 +63,28 @@ export default function AdminSection() {
               <CommandList>
                 <CommandEmpty>No assignee found.</CommandEmpty>
                 <CommandGroup>
-                  {assignees.map((assignee) => (
-                    <CommandItem
-                      key={assignee.value}
-                      value={assignee.name}
-                      onSelect={(currentValue) => {
-                        setValue(currentValue === value ? "" : currentValue);
-                        setOpen(false);
-                        const picked = assignees.find(a => a.name === currentValue);
-                        if (picked?.value) {
-                          window.location.href = `/dashboard/${picked.value}`;
-                        }
-                      }}
-                    >
-                      {assignee.name}
-                      <Check
-                        className={cn(
-                          "ml-auto",
-                          value === assignee.name
-                            ? "opacity-100"
-                            : "opacity-0"
-                        )}
-                      />
-                    </CommandItem>
-                  ))}
+                    {assignees.map((assignee) => (
+                      <CommandItem
+                        key={assignee.value}
+                        value={assignee.value}
+                        onSelect={(currentValue) => {
+                          setValue(currentValue === value ? "" : currentValue);
+                          setOpen(false);
+                          const picked = assignees.find((a) => a.value === currentValue);
+                          if (picked?.value) {
+                            window.location.href = `/dashboard/${picked.value}`;
+                          }
+                        }}
+                      >
+                        {assignee.name}
+                        <Check
+                          className={cn(
+                            "ml-auto",
+                            value === assignee.value ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                      </CommandItem>
+                    ))}
                 </CommandGroup>
               </CommandList>
             </Command>

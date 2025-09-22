@@ -8,7 +8,7 @@ import SummaryMetricCard from "@/components/SummaryMatricCard";
 import WeeklySummaryChart from "@/components/WeeklySummaryChart";
 import CurrentTasksTable from "@/components/CurrentTasksTable";
 import AdminSection from "@/components/AdminSection";
-import { getAssigneeByGid, getLastSync, getSummaryMetrics, getWeeklySummary } from "@/lib/data";
+import { getAssigneeByGid, getLastSync, getSummaryMetrics, getWeeklySummary, getAssignees } from "@/lib/data";
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage({ params }: { params: { "assignee-gid": string } }) {
@@ -21,6 +21,10 @@ export default async function DashboardPage({ params }: { params: { "assignee-gi
     getLastSync(),
     getAssigneeByGid(assigneeGid),
   ]);
+
+  // fetch assignees server-side and format for the AdminSection
+  const rawAssignees = await getAssignees();
+  const assigneeOptions = rawAssignees.map((a: any) => ({ name: `${a.firstname} ${a.lastname}`.trim(), value: a.assignee_gid }));
 
   const showAdmin = process.env.NEXT_PUBLIC_SHOW_ADMIN === '1';
 
@@ -72,7 +76,7 @@ export default async function DashboardPage({ params }: { params: { "assignee-gi
             </div>
           </CardContent>
         </Card>
-        {showAdmin && <AdminSection />}
+  {showAdmin && <AdminSection assignees={assigneeOptions} activeAssigneeGid={assigneeGid} />}
         <SummaryMetricCard total={metrics.total} completed={metrics.completed} overdue={metrics.overdue} completionRate={metrics.completionRate} />
         <WeeklySummaryChart data={weekly} />
         <CurrentTasksTable assigneeGid={assigneeGid} />
