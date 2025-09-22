@@ -167,19 +167,32 @@ export async function getCurrentTasks(
     }
   }
 
-  // Total count of matching subtasks where user is owner or follower
+  // Total count of matching subtasks where user is owner or follower.
+  // Note: apply the statusFilterWhere to both owner and follower branches so
+  // collaborator items are counted when filtering by status (e.g. overdue).
   const total = await prisma.subtasks.count({
     where: {
-      OR: [{ AND: [ownerWhere, statusFilterWhere] }, { AND: [followerWhere, statusFilterWhere] }],
+      OR: [
+        { AND: [ownerWhere, statusFilterWhere] },
+        { AND: [followerWhere, statusFilterWhere] },
+      ],
     },
   });
 
   // Fetch paginated rows from DB. We'll fetch subtasks with related task data.
   const start = (page - 1) * pageSize;
+  // When fetching rows, include the same status filter so DB pagination and
+  // ordering only return matching rows. We need to merge the owner/follower
+  // clauses with the statusFilterWhere appropriately.
+  const dbWhere: any = {
+    OR: [
+      { AND: [ownerWhere, statusFilterWhere] },
+      { AND: [followerWhere, statusFilterWhere] },
+    ],
+  };
+
   const dbRows = await prisma.subtasks.findMany({
-    where: {
-      OR: [ownerWhere, followerWhere],
-    },
+    where: dbWhere,
     select: {
       gid: true,
       name: true,
@@ -208,7 +221,9 @@ export async function getCurrentTasks(
   const mapped: CurrentTaskRow[] = dbRows.map((st) => {
     const isFollower = (st.task_followers ?? []).some((f) => f.follower_gid === assigneeGid);
     const type: CurrentTaskRow['type'] = st.assignee_gid === assigneeGid ? 'Owner' : isFollower ? 'Collaborator' : 'Owner';
-    const statusStr = computeStatus({ completed: st.completed ?? false, due_on: st.due_on ?? null });
+    // Compute status: prefer subtask.due_on but fall back to parent task due_on
+    const effectiveDue = st.due_on ?? st.tasks?.due_on ?? null;
+    const statusStr = computeStatus({ completed: st.completed ?? false, due_on: effectiveDue });
     return {
       gid: st.gid,
       name: st.name ?? "",
