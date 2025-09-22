@@ -74,27 +74,37 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
 
   const expected = Number(process.env.REPORT_EXPECTED_TASKS_PER_WEEK ?? 3);
 
-  // For performance, fetch only subtasks where the user is owner OR a follower.
-  // Include the task_followers relation so we can check follower membership without a
-  // separate global query. This reduces the amount of data returned from the DB.
-  const subtasks = await prisma.subtasks.findMany({
-    where: {
-      OR: [
-        { assignee_gid: assigneeGid },
-        { task_followers: { some: { follower_gid: assigneeGid } } },
-      ],
-    },
+  // Fetch tasks but include only the subtasks related to this assignee (owner or follower)
+  // so we can process everything in a single query. This reduces transferred rows and
+  // avoids a separate global subtasks query.
+  const tasksWithSubtasks = await prisma.tasks.findMany({
+    where: {},
     select: {
       gid: true,
-      parent_task_gid: true,
-      assignee_gid: true,
+      name: true,
+      due_on: true,
       completed: true,
-      task_followers: { select: { follower_gid: true } },
+      week_startdate: true,
+      subtasks: {
+        where: {
+          OR: [
+            { assignee_gid: assigneeGid },
+            { task_followers: { some: { follower_gid: assigneeGid } } },
+          ],
+        },
+        select: {
+          gid: true,
+          assignee_gid: true,
+          completed: true,
+          task_followers: { select: { follower_gid: true } },
+        },
+      },
     },
+    orderBy: { week_startdate: "asc" },
   });
 
   const byTask = new Map(
-    tasks.map((t) => [
+    tasksWithSubtasks.map((t) => [
       t.gid,
       {
         // Prefer week_startdate (if present) formatted for display, otherwise fall back to task name
@@ -106,26 +116,26 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
         expected,
         due_on: t.due_on ?? null,
         completedFlag: !!t.completed,
-        _week_startdate: t.week_startdate
+        _week_startdate: t.week_startdate,
       },
     ])
   );
 
   const today = new Date();
 
-  for (const st of subtasks) {
-    const bucket = byTask.get(st.parent_task_gid ?? "");
+  for (const t of tasksWithSubtasks) {
+    const bucket = byTask.get(t.gid);
     if (!bucket) continue;
-    const isOwner = st.assignee_gid === assigneeGid;
-    const isFollower = (st.task_followers ?? []).some((f) => f.follower_gid === assigneeGid);
-    // If the subtask is neither owned nor followed by the assignee, skip it. This
-    // can happen if the parent task wasn't present in the tasks list (or was filtered).
-    if (!isOwner && !isFollower) continue;
-    if (isOwner) bucket.assigned += 1;
-    if (isFollower) bucket.collab += 1;
-    if ((isOwner || isFollower) && st.completed) bucket.completed += 1;
-    if ((isOwner || isFollower) && !st.completed) {
-      if (bucket.due_on && bucket.due_on < today) bucket.overdue += 1;
+    for (const st of t.subtasks ?? []) {
+      const isOwner = st.assignee_gid === assigneeGid;
+      const isFollower = (st.task_followers ?? []).some((f) => f.follower_gid === assigneeGid);
+      if (!isOwner && !isFollower) continue;
+      if (isOwner) bucket.assigned += 1;
+      if (isFollower) bucket.collab += 1;
+      if ((isOwner || isFollower) && st.completed) bucket.completed += 1;
+      if ((isOwner || isFollower) && !st.completed) {
+        if (bucket.due_on && bucket.due_on < today) bucket.overdue += 1;
+      }
     }
   }
 
