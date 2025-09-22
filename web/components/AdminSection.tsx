@@ -28,13 +28,20 @@ export default function AdminSection({
   activeAssigneeGid?: string | null;
 }) {
   const [open, setOpen] = React.useState(false);
-  const [value, setValue] = React.useState(activeAssigneeGid ?? "");
+  const [value, setValue] = React.useState("");
   // use a stable id so Radix-generated ids don't mismatch between server and client
   const id = React.useId();
-  const selectedAssignee = assignees.find((assignee) => assignee.value === value);
+  // selectedAssignee by name (value stores name for search friendliness)
+  const selectedAssignee = assignees.find((assignee) => assignee.name === value);
+  // when active gid or assignees change, set the displayed value to the matching name
   React.useEffect(() => {
-    setValue(activeAssigneeGid ?? "");
-  }, [activeAssigneeGid]);
+    if (!activeAssigneeGid) {
+      setValue("");
+      return;
+    }
+    const found = assignees.find((a) => a.value === activeAssigneeGid);
+    setValue(found?.name ?? "");
+  }, [activeAssigneeGid, assignees]);
 
   return (
     <div className="my-4">
@@ -50,10 +57,7 @@ export default function AdminSection({
               aria-controls={`${id}-content`}
               className="w-[200px] justify-between"
             >
-              {value
-                ? assignees.find((assignee) => assignee.value === value)
-                    ?.name
-                : "Select assignee..."}
+              {value ? selectedAssignee?.name : "Select assignee..."}
               <ChevronsUpDown className="opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -66,11 +70,11 @@ export default function AdminSection({
                     {assignees.map((assignee) => (
                       <CommandItem
                         key={assignee.value}
-                        value={assignee.value}
+                        value={assignee.name}
                         onSelect={(currentValue) => {
                           setValue(currentValue === value ? "" : currentValue);
                           setOpen(false);
-                          const picked = assignees.find((a) => a.value === currentValue);
+                          const picked = assignees.find((a) => a.name === currentValue);
                           if (picked?.value) {
                             window.location.href = `/dashboard/${picked.value}`;
                           }
@@ -80,7 +84,7 @@ export default function AdminSection({
                         <Check
                           className={cn(
                             "ml-auto",
-                            value === assignee.value ? "opacity-100" : "opacity-0"
+                            value === assignee.name ? "opacity-100" : "opacity-0"
                           )}
                         />
                       </CommandItem>
