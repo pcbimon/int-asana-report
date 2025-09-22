@@ -11,7 +11,7 @@ import AdminSection from "@/components/AdminSection";
 import { getAssigneeByGid, getLastSync, getSummaryMetrics, getWeeklySummary } from "@/lib/data";
 import { redirect } from "next/navigation";
 
-export default async function DashboardPage({ params, searchParams }: { params: { "assignee-gid": string }, searchParams: { status?: string; page?: string; admin?: string } }) {
+export default async function DashboardPage({ params }: { params: { "assignee-gid": string } }) {
   const assigneeGid = params["assignee-gid"];
   if (!assigneeGid) redirect("/");
 
@@ -22,9 +22,7 @@ export default async function DashboardPage({ params, searchParams }: { params: 
     getAssigneeByGid(assigneeGid),
   ]);
 
-  const status = (searchParams.status ?? "all").toLowerCase();
-  const showAdmin = process.env.NEXT_PUBLIC_SHOW_ADMIN === '1' || searchParams.admin === '1';
-  const page = Number(searchParams.page ?? 1);
+  const showAdmin = process.env.NEXT_PUBLIC_SHOW_ADMIN === '1';
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -74,10 +72,10 @@ export default async function DashboardPage({ params, searchParams }: { params: 
             </div>
           </CardContent>
         </Card>
-  {showAdmin && <AdminSection />}
+        {showAdmin && <AdminSection />}
         <SummaryMetricCard total={metrics.total} completed={metrics.completed} overdue={metrics.overdue} completionRate={metrics.completionRate} />
         <WeeklySummaryChart data={weekly} />
-  <CurrentTasksTable assigneeGid={assigneeGid} />
+        <CurrentTasksTable assigneeGid={assigneeGid} />
       </div>
     </div>
   );

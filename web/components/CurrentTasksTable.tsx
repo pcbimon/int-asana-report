@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MdOutlineAccessTime } from "react-icons/md";
@@ -56,39 +56,49 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
     return `${pathname}${qs ? `?${qs}` : ""}`;
   };
 
-  useEffect(() => {
-    // Keep URL in sync when status or page changes
-    router.replace(buildUrl({ status, page }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, page]);
+  // request id to ignore out-of-order responses
+  const reqIdRef = useRef(0);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadData = async (newStatus?: StatusFilter, newPage?: number) => {
+    const s = newStatus ?? status;
+    const p = newPage ?? page;
+
+    // update local state (for UI) immediately
+    setStatus(s);
+    setPage(p);
+
+    // update url (preserve other params via sp)
+    router.replace(buildUrl({ status: s, page: p }));
+
     setLoading(true);
-    const fetchData = async () => {
-      try {
-        const qs = new URLSearchParams();
-        qs.set("status", status);
-        qs.set("page", String(page));
-        qs.set("pageSize", String(pageSize));
-        const res = await fetch(`/api/current-tasks/${encodeURIComponent(assigneeGid)}?${qs.toString()}`);
-        if (!res.ok) throw new Error("Failed to fetch");
-        const data = await res.json();
-        if (cancelled) return;
-        setRows(data.rows ?? []);
-        setTotal(data.total ?? 0);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchData();
-    return () => { cancelled = true; };
-  }, [assigneeGid, status, page, pageSize]);
+    const myId = ++reqIdRef.current;
+    try {
+      const qs = new URLSearchParams();
+      qs.set("status", s);
+      qs.set("page", String(p));
+      qs.set("pageSize", String(pageSize));
+      const res = await fetch(`/api/current-tasks/${encodeURIComponent(assigneeGid)}?${qs.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+      // ignore stale responses
+      if (myId !== reqIdRef.current) return;
+      setRows(data.rows ?? []);
+      setTotal(data.total ?? 0);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      if (myId === reqIdRef.current) setLoading(false);
+    }
+  };
 
-  const onChangePage = (p: number) => setPage(p);
-  const onChangeStatus = (s: StatusFilter) => { setStatus(s); setPage(1); };
+  useEffect(() => {
+    // initial load or when assignee changes
+    loadData(initialStatus, initialPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assigneeGid]);
+
+  const onChangePage = (p: number) => { loadData(undefined, p); };
+  const onChangeStatus = (s: StatusFilter) => { loadData(s, 1); };
 
   return (
     <div className="my-4">
