@@ -1,4 +1,5 @@
 import Image from "next/image";
+import MahidolLoginButton from "../components/MahidolLoginButton";
 
 export default function Home() {
   return (
@@ -49,6 +50,10 @@ export default function Home() {
           >
             Read our docs
           </a>
+        </div>
+        <div className="mt-4">
+          <MahidolLoginButton />
+          <p className="mt-2 text-xs text-muted-foreground">If you see "Auth library not installed", run <code>pnpm add next-auth</code> in the project root.</p>
         </div>
       </main>
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
