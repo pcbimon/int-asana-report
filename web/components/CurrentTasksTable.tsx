@@ -130,6 +130,7 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
           <Table>
             <TableHeader>
               <TableRow>
+                {/* enforce max width 50% for first column (table uses fixed layout) */}
                 <TableHead className="w-1/2">Task</TableHead>
                 <TableHead className="w-1/6">Week</TableHead>
                 <TableHead className="w-1/6">Due Date</TableHead>
@@ -143,8 +144,8 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
                     <TableRow key={`skeleton-${i}`}>
                       <TableCell className="font-medium">
                         <div className="flex flex-col space-y-2">
-                          <SkeletonText className="w-3/4" />
-                          <SkeletonText className="w-1/2 h-3" />
+                          <SkeletonText className="w-3/4 block truncate" />
+                          <SkeletonText className="w-1/2 h-3 block truncate" />
                         </div>
                       </TableCell>
                       <TableCell>
@@ -165,16 +166,16 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
                     <TableRow key={`${r.gid}-${r.type}`}>
                       <TableCell className="font-medium">
                         <div className="flex flex-col">
-                          <span className="font-medium">{r.name}</span>
+                          <span className="font-medium block truncate">{r.name}</span>
                           {r.followers && r.followers.length > 0 && (
-                            <span className="text-sm text-gray-500">
+                            <span className="text-sm text-gray-500 block truncate">
                               Collaborators: {r.followers.map(f => `${f.first_name} ${f.last_name}`).join(", ")}
                             </span>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{r.week || '-'}</TableCell>
-                      <TableCell>{r.due_on || '-'}</TableCell>
+                      <TableCell className="whitespace-nowrap">{r.week || '-'}</TableCell>
+                      <TableCell className="whitespace-nowrap">{r.due_on || '-'}</TableCell>
                       <TableCell>
                         {r.status === 'Completed' && (
                           <Badge variant="success">
