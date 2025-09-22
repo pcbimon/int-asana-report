@@ -1,4 +1,5 @@
 "use client";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MdOutlineAccessTime } from "react-icons/md";
@@ -26,19 +27,26 @@ import { CurrentTaskRow, StatusFilter } from "@/lib/types";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 type Props = {
-  rows: CurrentTaskRow[];
-  total: number;
-  page: number;
-  pageSize: number;
-  status: StatusFilter;
-  assigneeGid?: string;
+  assigneeGid: string;
 };
 
-export default function CurrentTasksTable({ rows, total, page, pageSize, status }: Props) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+export default function CurrentTasksTable({ assigneeGid }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
+
+  const initialStatus = (sp?.get("status") ?? "all") as StatusFilter;
+  const initialPage = Number(sp?.get("page") ?? 1);
+
+  const [status, setStatus] = useState<StatusFilter>(initialStatus);
+  const [page, setPage] = useState<number>(initialPage);
+  const [pageSize] = useState<number>(10);
+  const [rows, setRows] = useState<CurrentTaskRow[]>([]);
+  const [total, setTotal] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
   const buildUrl = (params: Partial<{ page: number; status: StatusFilter }>) => {
     const usp = new URLSearchParams(sp?.toString());
     if (params.status) usp.set("status", params.status);
@@ -47,8 +55,41 @@ export default function CurrentTasksTable({ rows, total, page, pageSize, status 
     const qs = usp.toString();
     return `${pathname}${qs ? `?${qs}` : ""}`;
   };
-  const onChangePage = (p: number) => router.push(buildUrl({ page: p }));
-  const onChangeStatus = (s: StatusFilter) => router.push(buildUrl({ status: s, page: 1 }));
+
+  useEffect(() => {
+    // Keep URL in sync when status or page changes
+    router.replace(buildUrl({ status, page }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, page]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const fetchData = async () => {
+      try {
+        const qs = new URLSearchParams();
+        qs.set("status", status);
+        qs.set("page", String(page));
+        qs.set("pageSize", String(pageSize));
+        const res = await fetch(`/api/current-tasks/${encodeURIComponent(assigneeGid)}?${qs.toString()}`);
+        if (!res.ok) throw new Error("Failed to fetch");
+        const data = await res.json();
+        if (cancelled) return;
+        setRows(data.rows ?? []);
+        setTotal(data.total ?? 0);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchData();
+    return () => { cancelled = true; };
+  }, [assigneeGid, status, page, pageSize]);
+
+  const onChangePage = (p: number) => setPage(p);
+  const onChangeStatus = (s: StatusFilter) => { setStatus(s); setPage(1); };
+
   return (
     <div className="my-4">
       <Card>
@@ -122,7 +163,7 @@ export default function CurrentTasksTable({ rows, total, page, pageSize, status 
           </Table>
           <div className="flex justify-between mt-4">
             <div className="text-sm text-gray-500">
-              {`Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, total)} of ${total} entries`}
+              {loading ? 'Loading...' : `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, total)} of ${total} entries`}
             </div>
             <div className="flex items-center">
               <Pagination>

@@ -8,7 +8,7 @@ import SummaryMetricCard from "@/components/SummaryMatricCard";
 import WeeklySummaryChart from "@/components/WeeklySummaryChart";
 import CurrentTasksTable from "@/components/CurrentTasksTable";
 import AdminSection from "@/components/AdminSection";
-import { getAssigneeByGid, getCurrentTasks, getLastSync, getSummaryMetrics, getWeeklySummary } from "@/lib/data";
+import { getAssigneeByGid, getLastSync, getSummaryMetrics, getWeeklySummary } from "@/lib/data";
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage({ params, searchParams }: { params: { "assignee-gid": string }, searchParams: { status?: string; page?: string; admin?: string } }) {
@@ -25,7 +25,6 @@ export default async function DashboardPage({ params, searchParams }: { params: 
   const status = (searchParams.status ?? "all").toLowerCase();
   const showAdmin = process.env.NEXT_PUBLIC_SHOW_ADMIN === '1' || searchParams.admin === '1';
   const page = Number(searchParams.page ?? 1);
-  const { rows, total, pageSize } = await getCurrentTasks(assigneeGid, { status: status as any, page, pageSize: 10 });
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -78,7 +77,7 @@ export default async function DashboardPage({ params, searchParams }: { params: 
   {showAdmin && <AdminSection />}
         <SummaryMetricCard total={metrics.total} completed={metrics.completed} overdue={metrics.overdue} completionRate={metrics.completionRate} />
         <WeeklySummaryChart data={weekly} />
-        <CurrentTasksTable rows={rows} total={total} page={page} pageSize={pageSize} status={status as any} />
+  <CurrentTasksTable assigneeGid={assigneeGid} />
       </div>
     </div>
   );
