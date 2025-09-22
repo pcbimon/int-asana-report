@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "./ui/badge";
+import { Skeleton, SkeletonText } from "./ui/skeleton";
 import {
   Pagination,
   PaginationContent,
@@ -138,37 +139,60 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
-                <TableRow key={`${r.gid}-${r.type}`}>
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col">
-                      <span className="font-medium">{r.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>{r.week || '-'}</TableCell>
-                  <TableCell>{r.due_on || '-'}</TableCell>
-                  <TableCell>
-                    {r.status === 'Completed' && (
-                      <Badge variant="success">
-                        <IoMdCheckmarkCircleOutline /> Completed
-                      </Badge>
-                    )}
-                    {r.status === 'Pending' && (
-                      <Badge variant="secondary">
-                        <MdOutlineAccessTime /> Pending
-                      </Badge>
-                    )}
-                    {r.status === 'Overdue' && (
-                      <Badge variant="destructive">
-                        <BsExclamationTriangle /> Overdue
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={r.type === 'Owner' ? 'default' : 'secondary'}>{r.type === 'Owner' ? 'Owner' : 'Collaborator'}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {loading
+                ? Array.from({ length: 10 }).map((_, i) => (
+                    <TableRow key={`skeleton-${i}`}>
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col space-y-2">
+                          <SkeletonText className="w-3/4" />
+                          <SkeletonText className="w-1/2 h-3" />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <SkeletonText className="w-1/2" />
+                      </TableCell>
+                      <TableCell>
+                        <SkeletonText className="w-1/2" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="inline-block h-6 px-3 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="inline-block h-6 px-3 w-28" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                : rows.map((r) => (
+                    <TableRow key={`${r.gid}-${r.type}`}>
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{r.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{r.week || '-'}</TableCell>
+                      <TableCell>{r.due_on || '-'}</TableCell>
+                      <TableCell>
+                        {r.status === 'Completed' && (
+                          <Badge variant="success">
+                            <IoMdCheckmarkCircleOutline /> Completed
+                          </Badge>
+                        )}
+                        {r.status === 'Pending' && (
+                          <Badge variant="secondary">
+                            <MdOutlineAccessTime /> Pending
+                          </Badge>
+                        )}
+                        {r.status === 'Overdue' && (
+                          <Badge variant="destructive">
+                            <BsExclamationTriangle /> Overdue
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={r.type === 'Owner' ? 'default' : 'secondary'}>{r.type === 'Owner' ? 'Owner' : 'Collaborator'}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
             </TableBody>
           </Table>
           <div className="flex justify-between mt-4">
