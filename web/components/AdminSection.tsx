@@ -55,13 +55,13 @@ export default function AdminSection({
               role="combobox"
               aria-expanded={open}
               aria-controls={`${id}-content`}
-              className="w-[200px] justify-between"
+              className=" justify-between"
             >
               {value ? selectedAssignee?.name : "Select assignee..."}
               <ChevronsUpDown className="opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent id={`${id}-content`} className="w-[200px] p-0">
+          <PopoverContent id={`${id}-content`} className=" p-0">
             <Command>
               <CommandInput placeholder="Search assignee..." className="h-9" />
               <CommandList>
