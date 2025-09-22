@@ -68,7 +68,7 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
   // Group by parent task (which encodes the week) and count subtasks
   const tasks = await prisma.tasks.findMany({
     select: { gid: true, name: true, due_on: true, completed: true, week_startdate: true },
-    orderBy: { created_at: "asc" },
+    orderBy: { week_startdate: "asc" },
   });
 
   const expected = Number(process.env.REPORT_EXPECTED_TASKS_PER_WEEK ?? 3);
@@ -97,8 +97,7 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
         expected,
         due_on: t.due_on ?? null,
         completedFlag: !!t.completed,
-        // keep raw week_startdate for stable sorting (may be null)
-        _week_startdate: t.week_startdate ?? null,
+        _week_startdate: t.week_startdate
       },
     ])
   );
@@ -109,7 +108,7 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
     const bucket = byTask.get(st.parent_task_gid ?? "");
     if (!bucket) continue;
     const isOwner = st.assignee_gid === assigneeGid;
-  const isFollower = followersBySubtask.get(st.gid)?.has(assigneeGid) ?? false;
+    const isFollower = followersBySubtask.get(st.gid)?.has(assigneeGid) ?? false;
     if (isOwner) bucket.assigned += 1;
     if (isFollower) bucket.collab += 1;
     if ((isOwner || isFollower) && st.completed) bucket.completed += 1;
@@ -121,18 +120,8 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
   const result: (WeeklyPoint & { _week_startdate?: string | null })[] = [];
   for (const [gid, v] of byTask) {
     if (v.assigned + v.collab + v.completed + v.overdue === 0) continue; // skip empty
-  result.push({ week: v.label, assigned: v.assigned, completed: v.completed, overdue: v.overdue, collab: v.collab, expected: v.expected, _week_startdate: v._week_startdate ? new Date(v._week_startdate).toISOString() : null });
+    result.push({ week: v.label, assigned: v.assigned, completed: v.completed, overdue: v.overdue, collab: v.collab, expected: v.expected, _week_startdate: v._week_startdate ? new Date(v._week_startdate).toISOString() : null });
   }
-  // Sort by week_startdate newest-first. Items without week_startdate go last, sorted by label as a fallback.
-  result.sort((a, b) => {
-    const aDate = a._week_startdate ? new Date(a._week_startdate).getTime() : null;
-    const bDate = b._week_startdate ? new Date(b._week_startdate).getTime() : null;
-    if (aDate && bDate) return bDate - aDate; // newest first
-    if (aDate && !bDate) return -1; // a has date -> comes before
-    if (!aDate && bDate) return 1; // b has date -> comes before
-    // both null -> fallback to label descending
-    return b.week.localeCompare(a.week);
-  });
 
   // Clean up internal sort key before returning
   return result.map(({ _week_startdate, ...rest }) => rest as WeeklyPoint);
@@ -156,18 +145,28 @@ export async function getCurrentTasks(
         created_at: true,
         tasks: { select: { gid: true, name: true, due_on: true, week_startdate: true } },
       },
+      orderBy: { tasks: { week_startdate: "desc" } },
     }),
     prisma.task_followers.findMany({
       where: { follower_gid: assigneeGid },
-      select: { task_gid: true },
+      select: {
+        subtasks: {
+          select: {
+            gid: true,
+            name: true,
+            assignee_gid: true,
+            completed: true,
+            created_at: true,
+            tasks: { select: { gid: true, name: true, due_on: true, week_startdate: true } },
+          },
+        },
+      },
+      orderBy: { subtasks: { tasks: { week_startdate: "desc" } } },
     }),
   ]);
 
-  const followerTaskIds = new Set(followerLinks.map((f) => f.task_gid));
-  const followedSubtasks = await prisma.subtasks.findMany({
-    where: { gid: { in: Array.from(followerTaskIds) } },
-    select: { gid: true, name: true, assignee_gid: true, completed: true, created_at: true, tasks: { select: { gid: true, name: true, due_on: true, week_startdate: true } } },
-  });
+  // Normalize follower links to the same shape as `owned`
+  const followedSubtasks = followerLinks.flatMap((f) => (f.subtasks ? [f.subtasks] : [])) as typeof owned;
 
   // Build rows
   const allRows: CurrentTaskRow[] = [];
@@ -177,7 +176,6 @@ export async function getCurrentTasks(
     allRows.push({
       gid: st.gid,
       name: st.name ?? "",
-      // Prefer formatted week_startdate when available
       week: st.tasks?.week_startdate ? new Date(st.tasks.week_startdate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : st.tasks?.name ?? "",
       created_at: st.created_at ?? null,
       due_on: st.tasks?.due_on ?? null,
@@ -193,22 +191,82 @@ export async function getCurrentTasks(
   const filtered = allRows.filter((r) =>
     status === "all" ? true : r.status.toLowerCase() === status
   );
-
-  // Sort: due date desc, then status order Completed, Overdue, Pending
+  // Sort: status order Completed, Overdue, Pending
   const statusRank: Record<CurrentTaskRow["status"], number> = {
     Completed: 0,
     Overdue: 1,
     Pending: 2,
   };
-  filtered.sort((a, b) => {
-    const dueA = a.due_on?.getTime() ?? 0;
-    const dueB = b.due_on?.getTime() ?? 0;
-    if (dueA !== dueB) return dueB - dueA;
-    return statusRank[a.status] - statusRank[b.status];
+
+  // Instead of doing pagination in-memory, perform DB-level pagination.
+  // We'll compute total count from filtered rows and then fetch a page using
+  // offset/limit. To do that efficiently we need minimal fields from DB and
+  // then map to the same shape.
+  // Build where clauses for owner and follower
+  const ownerWhere = { assignee_gid: assigneeGid };
+  const followerWhere = { task_followers: { some: { follower_gid: assigneeGid } } };
+
+  // Build base where depending on status filter
+  const statusFilterWhere: any = {};
+  if (status !== "all") {
+    if (status === "completed") {
+      statusFilterWhere.completed = true;
+    } else if (status === "pending") {
+      statusFilterWhere.completed = false;
+    } else if (status === "overdue") {
+      // overdue = parent task due_on < today AND subtask not completed
+      statusFilterWhere.completed = false;
+      statusFilterWhere.tasks = { due_on: { lt: new Date(new Date().toDateString()) } };
+    }
+  }
+
+  // Total count of matching subtasks where user is owner or follower
+  const total = await prisma.subtasks.count({
+    where: {
+      OR: [{ AND: [ownerWhere, statusFilterWhere] }, { AND: [followerWhere, statusFilterWhere] }],
+    },
   });
 
-  const total = filtered.length;
+  // Fetch paginated rows from DB. We'll fetch subtasks with related task data.
   const start = (page - 1) * pageSize;
-  const rows = filtered.slice(start, start + pageSize);
-  return { rows, total, pageSize };
+  const dbRows = await prisma.subtasks.findMany({
+    where: {
+      OR: [ownerWhere, followerWhere],
+    },
+    select: {
+      gid: true,
+      name: true,
+      assignee_gid: true,
+      completed: true,
+      created_at: true,
+      due_on: true,
+      tasks: { select: { gid: true, name: true, due_on: true, week_startdate: true } },
+      task_followers: { select: { follower_gid: true } },
+    },
+    orderBy: { tasks: { week_startdate: "desc" } },
+    skip: start,
+    take: pageSize,
+  });
+
+  // Map DB rows to CurrentTaskRow[] and apply status filter (since complex overdue logic
+  // combining tasks.due_on and completed is easier in JS for formatting consistency)
+  const mapped: CurrentTaskRow[] = dbRows.map((st) => {
+    const isFollower = (st.task_followers ?? []).some((f) => f.follower_gid === assigneeGid);
+    const type: CurrentTaskRow['type'] = st.assignee_gid === assigneeGid ? 'Owner' : isFollower ? 'Collaborator' : 'Owner';
+    const statusStr = computeStatus({ completed: st.completed ?? false, due_on: st.tasks?.due_on ?? null });
+    return {
+      gid: st.gid,
+      name: st.name ?? "",
+      week: st.tasks?.week_startdate ? new Date(st.tasks.week_startdate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : st.tasks?.name ?? "",
+      created_at: st.created_at ?? null,
+      due_on: st.tasks?.due_on ?? null,
+      status: statusStr,
+      type,
+    };
+  }).filter((r) => (status === 'all' ? true : r.status.toLowerCase() === status));
+
+  // Sort the mapped page by status rank to preserve previous ordering
+  mapped.sort((a, b) => statusRank[a.status] - statusRank[b.status]);
+
+  return { rows: mapped, total, pageSize };
 }
