@@ -76,7 +76,8 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
       qs.set("status", s);
       qs.set("page", String(p));
       qs.set("pageSize", String(pageSize));
-      const res = await fetch(`/api/current-tasks/${encodeURIComponent(assigneeGid)}?${qs.toString()}`);
+      qs.set("assignee", assigneeGid);
+      const res = await fetch(`/api/current-tasks?${qs.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       // ignore stale responses
