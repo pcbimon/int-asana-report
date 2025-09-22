@@ -68,8 +68,6 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
     setStatus(s);
     setPage(p);
 
-    // update url (preserve other params via sp)
-    router.replace(buildUrl({ status: s, page: p }));
 
     setLoading(true);
     const myId = ++reqIdRef.current;
