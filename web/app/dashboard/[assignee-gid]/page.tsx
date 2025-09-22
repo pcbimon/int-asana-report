@@ -12,7 +12,9 @@ import { getAssigneeByGid, getLastSync, getSummaryMetrics, getWeeklySummary, get
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage({ params }: { params: { "assignee-gid": string } }) {
-  const assigneeGid = params["assignee-gid"];
+  // next/app router may provide async params; await to satisfy Next.js sync-dynamic-apis rule
+  const awaitedParams = await params as { "assignee-gid": string };
+  const assigneeGid = awaitedParams["assignee-gid"];
   if (!assigneeGid) redirect("/");
 
   const [metrics, weekly, lastSync, assignee] = await Promise.all([
