@@ -48,6 +48,12 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+  // keep refs for current status/page so loadData can be stable and
+  // not capture changing state (which would change its identity and
+  // re-trigger the initial effect)
+  const statusRef = useRef<StatusFilter>(initialStatus);
+  const pageRef = useRef<number>(initialPage);
+
   // helper kept for possible future use
   // const buildUrl = (params: Partial<{ page: number; status: StatusFilter }>) => {
   //   const usp = new URLSearchParams(sp?.toString());
@@ -62,13 +68,14 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
   const reqIdRef = useRef(0);
 
   const loadData = useCallback(async (newStatus?: StatusFilter, newPage?: number) => {
-    const s = newStatus ?? status;
-    const p = newPage ?? page;
+    const s = newStatus ?? statusRef.current;
+    const p = newPage ?? pageRef.current;
 
-    // update local state (for UI) immediately
+    // update refs and local state (for UI) immediately
+    statusRef.current = s;
+    pageRef.current = p;
     setStatus(s);
     setPage(p);
-
 
     setLoading(true);
     const myId = ++reqIdRef.current;
@@ -90,7 +97,7 @@ export default function CurrentTasksTable({ assigneeGid }: Props) {
     } finally {
       if (myId === reqIdRef.current) setLoading(false);
     }
-  }, [assigneeGid, page, pageSize, status]);
+  }, [assigneeGid, pageSize]);
 
   useEffect(() => {
     // initial load or when assignee or initial params change
