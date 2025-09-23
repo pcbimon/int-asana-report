@@ -19,7 +19,7 @@ services:
 
   web:
     build:
-      context: .
+      context: ./web
       dockerfile: Dockerfile
     depends_on:
       db:
