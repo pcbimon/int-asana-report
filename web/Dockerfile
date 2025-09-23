@@ -15,17 +15,13 @@ COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
 RUN \
   if [ -f yarn.lock ]; then \
     yarn --frozen-lockfile; \
-    yarn prisma generate \
   elif [ -f package-lock.json ]; then \
     npm ci; \
-    prisma generate \
   elif [ -f pnpm-lock.yaml ]; then \
     corepack enable pnpm && pnpm i --frozen-lockfile; \
-    pnpm prisma generate \
   else \
     echo "No lockfile found - falling back to 'npm install' (not recommended for production builds)"; \
     npm install --no-audit --no-fund; \
-    prisma generate \
   fi
 
 
@@ -34,7 +30,8 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
+# run generate the prisma client
+RUN npx prisma generate
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line in case you want to disable telemetry during the build.
