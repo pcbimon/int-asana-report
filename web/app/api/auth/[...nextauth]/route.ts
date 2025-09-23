@@ -35,7 +35,7 @@ const mahidolProvider: OAuthConfig<ADFSProfile> = {
   clientSecret: process.env.ADFS_CLIENT_SECRET,
   checks: ["pkce", "state"],
   // profile receives either the /userinfo result or the decoded id_token claims
-  profile(profile: ADFSProfile, tokens: TokenSet) {
+  profile(profile: ADFSProfile) {
     const id = profile.sub ?? profile.upn ?? profile.unique_name ?? "";
     const given = profile.given_name ?? undefined;
     const family = profile.family_name ?? undefined;
@@ -59,7 +59,7 @@ export const authOptions: NextAuthOptions = {
       // account may include token fields (access_token, id_token) depending on provider
       if (account) {
         const acct = account as Partial<TokenSet> & Account;
-        const access = acct.access_token ?? (acct as any).accessToken; // fallback naming
+        const access = acct.access_token ?? ((acct as unknown) as Record<string, unknown>)['accessToken']; // fallback naming
         if (access) {
           (token as Record<string, unknown>)["accessToken"] = access as string;
         }

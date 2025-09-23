@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 
 export default function MahidolLoginButton() {
   const [authAvailable, setAuthAvailable] = useState<boolean | null>(null);
-  const [signInFn, setSignInFn] = useState<null | ((...args: any[]) => void)>(null);
+  const [signInFn, setSignInFn] = useState<null | ((provider?: string, options?: Record<string, unknown>) => void)>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -15,7 +15,7 @@ export default function MahidolLoginButton() {
       .then((mod) => {
         if (!mounted) return;
         setAuthAvailable(true);
-        setSignInFn(() => (mod.signIn as unknown) as (...args: any[]) => void);
+        setSignInFn(() => (mod.signIn as unknown) as (provider?: string, options?: Record<string, unknown>) => void);
       })
       .catch(() => {
         if (!mounted) return;
