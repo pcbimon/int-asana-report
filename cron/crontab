@@ -1,0 +1,2 @@
+# Run every day at 02:00 and POST to web service /sync
+0 2 * * * /usr/bin/curl -sS -X POST http://web:3000/sync -H "Content-Type: application/json" -d '{}' || echo "curl failed with $?" 

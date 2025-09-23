@@ -1,207 +1,52 @@
-# Copilot Instructions for Individual Dashboard (Next.js + TypeScript + ECharts)
+## Copilot / AI agent guidance for int-asana-report
 
-Purpose
-- Implement an Individual Dashboard to analyze per-assignee work from Asana Project data.
-- Tech stack: Next.js (TypeScript), ECharts, Shadcn, Tailwind CSS. Database using Supabase.
+Focus: this repo runs a small containerized stack (Postgres + nginx) used for generating Asana-related reports seeded from `db_initial.sql`. Keep changes minimal, container-friendly, and well-documented.
 
-Repository layout (recommended)
-- /src
-  - /components
-    - Header.tsx
-    - KpiCards.tsx
-    - WeeklySummaryChart.tsx
-    - CurrentTasksTable.tsx
-    - FiltersPanel.tsx
-    - ExportButtons.tsx
-  - /lib
-    - asanaApi.ts
-    - dataProcessor.ts
-    - storage.ts
-  - /models
-    - asanaReport.ts
-  - /app
-    - /protected
-      - /dashboard/[assignee]
-      - /sync
-    - /auth
-      - login
-      - logout
-      - confirm
-      - forgot-password
-      - sign-up
-      - sign-up-success
-      - update-password
-    - /404.tsx
-  - /styles
-    - tailwind.css
+Key components
+- `docker-compose.yml` — primary developer entrypoint; use it to start the stack and inspect service port mappings.
+- `Dockerfile` — app image build; follow existing layer ordering (system packages → app code → entrypoint) and prefer cache-friendly edits.
+- `db_initial.sql` — canonical DB initializer (schema + seed). Treat it as the source of truth for local schema changes.
+- `nginx/conf.d/default.conf` — HTTP fronting and proxy config for local runs.
 
-Data model (TypeScript)
-- class AsanaReport { sections: Section[]; }
-- class Section { gid: string; name: string; tasks: Task[]; }
-- class Task { gid: string; name: string; assignee?: Assignee; completed: boolean; completed_at?: string; subtasks?: Subtask[]; due_on?: string; project?: string; }
-- class Assignee { gid: string; name: string; email?: string; }
-- class Subtask { gid: string; name: string; assignee?: Assignee; completed: boolean; created_at?: string; completed_at?: string; due_on?: string; parent_task_gid: string; }
-- class FollowerTask { subTask: Subtask; user: Assignee; }
+Developer workflows
+- Start the stack (rebuild images): run `docker compose up --build` from the repo root.
+- Recreate DB from scratch: `docker compose down -v` then `docker compose up --build` (this removes the persisted `volumes/db_data`).
 
-Asana API helpers (/lib/asanaApi.ts)
-- fetchSections(): GET {{BASE_URL}}/projects/{{PROJECT_ID}}/sections
-- fetchTasksInSection(sectionGid): GET {{BASE_URL}}/sections/{{sectionGid}}/tasks?opt_fields=name,assignee,completed,completed_at,due_on,projects,custom_fields
-- fetchSubtasks(taskGid): GET {{BASE_URL}}/tasks/{{taskGid}}/subtasks?opt_fields=name,assignee,completed,created_at,completed_at
-- Use Authorization: Bearer {{TOKEN}}. Retry + backoff and handle rate limits.
+Concrete values you'll use
+- Services: `db`, `web`, and `nginx` (as defined in `docker-compose.yml`).
+- Ports: Postgres listens on host 5432 (compose maps "5432:5432"), app on 3000 ("3000:3000"), nginx on 80 ("80:80").
+- Volumes: local Postgres data is mounted at `./volumes/db_data:/var/lib/postgresql/data`.
+- Database connection example used by the app (env var `DATABASE_URL`):
+	postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 
-Data processing (/lib/dataProcessor.ts)
-- Merge sections -> tasks -> subtasks into AsanaReport instance.
-- Normalize assignees (map by gid).
-- Compute derived fields per task: overdue (due_on < today && not completed), lead time (completed_at - created_at).
-- Produce per-assignee aggregates: total, completed, overdue, avgTime, weekly timeseries.
-- Short description: Calculate all metrics (total, completed, overdue, avgTime, weekly timeseries, etc.) from Subtask entries only — do not use Task data directly to compute results, except when showing a Task's "created week" purely for display.
-- Reason: Tasks are treated as the week they were created for display/grouping, but the actual work metrics (work done/completed/overdue/lead time) come from Subtasks, which are the real work units.
-- Mapping rules:
-  - Every subtask is the primary unit for aggregates and timeseries.
-  - If subtask.assignee is missing, ignore that subtask.
-  - completed / completed_at / created_at are always taken from the subtask when calculating lead time, overdue, and weekly buckets.
-- Task-level created-week display:
-  - Ignore subtask.created_at for the Task-level "created week" display; however, use subtask.created_at, subtask.completed_at, and subtask.assignee for all metric calculations.
-- Table display of tasks:
-  - Show subtasks grouped by their section.
-  - For each subtask, show its created week (from subtask.created_at), assignee (from subtask.assignee), due date (from subtask.due_on), and status (from subtask.completed).
-  - Do not use subtask data to determine the Task's created week or assignee for display purposes.
-- Convert timestamps:
-  - Convert all timestamps to ISO (UTC) before computing or grouping by week to reduce timezone issues.
-  - If mixed metrics (Task + Subtask) are needed, expose a flag/option to preserve the current behavior.
-- Usage examples:
-  - weeklyTimeseries.assigned = count subtask.created_at by the week of created_at (or by assigned date if present)
-  - weeklyTimeseries.completed = count subtask.completed_at by the week of completed_at
-  - avgTime = average (subtask.completed_at - subtask.created_at) per assignee
-- Assignee list (for admin)
-  - Collect all unique assignees from tasks and subtasks.
-  - Provide a list of assignees for filtering in the UI.
-  - display assignee email.
-- Weekly Summary Chart
-  - X-axis: weeks (from earliest subtask.created_at to latest subtask.completed_at)
-  - Y-axis: count of tasks
-  - Two lines: assigned (count of subtasks created that week), completed (count of subtasks completed that week)
-  - Overlay a constant line for "Expected completion tasks" from env var NEXT_EXPECTED_COMPLETION_TASKS (e.g. 3 tasks per week)
-  - fill data 52 weeks from last year to current week with 0 for better chart display.
+Repository patterns & conventions
+- Schema-first approach: prefer editing `db_initial.sql` for schema or seed changes. Document in the commit message whether a `db_data` reset is required.
+- Minimal infra surface: the project intentionally avoids heavyweight orchestration — Postgres stores data, nginx fronts HTTP. Keep logic out of infra unless necessary.
+- Local persistent data: `volumes/db_data` holds Postgres files. When testing schema changes, recreate volumes to ensure consistent state.
 
-Supabase library 
-- client.ts: initialize Supabase client with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (server-side only).
-- server.ts: initialize Supabase client with `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` (for client-side use).
-- middleware.ts: handle auth session from cookies and attach to request context.
-- utils.ts: helper functions for auth, e.g. getUserRole(uid), getUserAssignee(uid).
+Integration points & external deps
+- The compose stack is self-contained. If you add external APIs, declare required env vars in compose override(s) and never commit secrets.
+- Network and port changes should be made in `docker-compose.yml` and mirrored in `nginx/conf.d/default.conf` when relevant.
 
-Storage and sync (/lib/storage.ts)
-- This file describes storing data from Asana into Supabase using a "1 Class Model = 1 Table" approach and includes a special table `sync_metadata` to store the `updated_at` of the last sync.
-- Recommended schema:
-  - assignees (gid TEXT PRIMARY KEY, name TEXT, email TEXT)
-  - sections (gid TEXT PRIMARY KEY, name TEXT)
-  - tasks (gid TEXT PRIMARY KEY, name TEXT, section_gid TEXT, assignee_gid TEXT, completed BOOLEAN, completed_at TIMESTAMPTZ, created_at TIMESTAMPTZ, due_on DATE, project TEXT)
-  - subtasks (gid TEXT PRIMARY KEY, name TEXT, parent_task_gid TEXT, assignee_gid TEXT, completed BOOLEAN, created_at TIMESTAMPTZ, completed_at TIMESTAMPTZ, due_on DATE)
-  - followers (subtask_gid TEXT NOT NULL REFERENCES subtasks(gid) ON DELETE CASCADE, assignee_gid TEXT NOT NULL REFERENCES assignees(gid) ON DELETE CASCADE, PRIMARY KEY (subtask_gid, assignee_gid))
-  - sync_metadata (key TEXT PRIMARY KEY, message TEXT, record_count INTEGER, status TEXT, updated_at TIMESTAMPTZ)
-  - user_roles (uid TEXT PRIMARY KEY, role TEXT) -- consider UUID if using Supabase auth users
-  - user_assignees (uid TEXT PRIMARY KEY, assignee_gid TEXT REFERENCES assignees(gid) ON DELETE SET NULL)
-- Roles:
-  - admin: full access to all data and sync and can view all assignees by default
-  - user: read-only access to their own assignee data
-- Use Supabase client with `SUPABASE_SERVICE_ROLE_KEY` for full access (server-side only).
-- Use upsert for save/update operations.
-- Main functions in the file:
-  - saveReport(report, metadataKey): save/update assignees, sections, tasks, subtasks (use upsert) and then update `sync_metadata.updated_at`
-  - loadReport(): read all tables, join relationships (assignee maps, task -> subtasks, tasks -> sections) and return an AsanaReport
-  - getLastUpdated / setLastUpdated: read/write the timestamp in `sync_metadata`
-- Gotchas / cautions:
-  - Use ISO format for time strings (new Date().toISOString()) for consistency
-  - Send optional fields as `null` in payload so upsert behaves as expected
-  - Current code does not use transactions; for atomicity consider Postgres transactions / RPC
-  - Verify permissions for `SUPABASE_KEY` — keep it server-side only
-- Short recommendations:
-  - Add error handling and return upsert results to verify success
-  - Create indexes on foreign keys (section_gid, parent_task_gid, assignee_gid) to improve query performance
-  - For large datasets consider batch upsert or pagination
+Editing guidelines & examples
+- Edit nginx and test: change `nginx/conf.d/default.conf`, then `docker compose up --build nginx` and reload the mapped HTTP port.
+- Edit DB schema: add SQL to `db_initial.sql` and run `docker compose down -v && docker compose up --build` to reprovision.
 
-Pages & routing
-- protected/dashboard/[assignee] — server-side render minimal skeleton; fetch from Supabase data on server-side and hydrate charts.
-- Authentication: protect route with middleware (JWT/session). On auth success, show only data for authenticated assignee and must create login link from https://supabase.com/docs/guides/auth/server-side/nextjs?queryGroups=router&router=app
-- protected/sync — trigger data fetch from Asana, process, and save to Supabase. Show last sync time and status.
-- /Auth/login — simple login form (use env vars for test user).
-- /Auth/logout — clear session and redirect to login.
-- 404 page for unknown assignees.
-- /auth/confirm?access_token=... for create new user to access dashboard. validate token and create user password from `supabase` invite user by email and redirect to login. super admin can invite user from supabase dashboard.
-- /auth/forgot-password for reset password form. send reset email from supabase auth.
-- /auth/sign-up for new user registration. only admin can create new user from supabase dashboard.
-- /auth/sign-up-success page after sign-up.
-- /auth/update-password for update password form after reset password email link.
+Small contract (inputs/outputs) for changes you might be asked to implement
+- Inputs: changes to SQL (`db_initial.sql`), Node app code (root project files), and nginx config.
+- Outputs: deterministic container image builds, a working web app at host:3000 (proxied at host:80), and a reproducible DB state when `db_data` is reset.
 
-UI & Components
-- Header: assignee name, export buttons.
-- KpiCards: total tasks, completed, completion rate, overdue, avg time.
-- Charts: use ECharts React wrapper, responsive. Provide props for data, color theme, tooltip, legend.
-  - Weekly Line: tasks assigned vs completed per week; overlay Expected completion tasks line.
-- CurrentTasksTable: columns: Task(display sub task name),Assign Status(Owner, Followers), Project/Section, Due date, Status, Priority. Support sort, filter, search, pagination.
-- FiltersPanel: time-range, project, status. Persist filters in URL query params.
-Note : Expected completion tasks is single line from constant by env var NEXT_EXPECTED_COMPLETION_TASKS (e.g. 3 tasks per week).
+Common edge cases
+- Local DB volume exists: schema edits will not apply until the `db_data` volume is removed and the DB is reinitialized.
+- Missing lockfile: `Dockerfile` falls back to `npm install` and `npm run build` if no lockfile is present; prefer committing a lockfile for reproducible builds.
+- Environment vars: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, and `ASANA_TOKEN` are required for a full stack run; compose expects them in the shell environment or an env file.
 
-Export & Print
-- Export to PDF: render printable page and use window.print() or html2pdf.
-- Export to Excel: generate CSV/XLSX from current filtered data (SheetJS).
+What not to do
+- Do not introduce a migration framework without agreement from maintainers; this repository uses `db_initial.sql` as the initializer.
+- Do not commit secrets or credentials; use environment variables and compose overrides for local testing.
 
-Styling
-- Tailwind CSS for responsive layout and use `Shadcn` as Main UI components. Ensure accessible from desktop and mobile.
+PR notes
+- If a change requires resetting developer data or changing ports, mention it in the PR description and include reproduction steps.
 
-Testing & quality
-- Unit tests for dataProcessor functions (Jest).
-- Integration tests for API helpers (msw to mock Asana).
-- Linting: ESLint + Prettier. Type-check CI step.
+If anything is missing or unclear, tell me which workflows you rely on most and I will expand this document.
 
-Environment & setup
-Note: If you've already added your environment secrets in your deployment/provider (for example Vercel, Netlify, or your CI), do NOT create a local .env.local that contains sensitive tokens. Read env keys from the provider-managed environment instead and access them server-side.
-
-1. Environment variables (use server-side secrets)
-   - Suggested server-only variable names (do NOT prefix with NEXT_PUBLIC_ for secrets):
-     - ASANA_BASE_URL=https://app.asana.com/api/1.0
-     - ASANA_TOKEN=your_pat_here
-     - ASANA_PROJECT_ID=your_project_id
-     - ASANA_TEAM_ID=your_team_id
-   - How to use: read these with `process.env.ASANA_TOKEN` etc. from Next.js API routes or server components. Avoid shipping `ASANA_TOKEN` to the client; proxy Asana requests through an API route that uses the server env.
-
-2. If you must expose non-sensitive values to the client, use a non-secret variable prefixed with `NEXT_PUBLIC_` (only for public, non-sensitive values). Prefer exposing data through an API route instead of exposing tokens.
-
-3. Install: using yarn as package manager
-  - yarn install
-  - yarn add echarts echarts-for-react tailwindcss axios dayjs js-cookie xlsx html2canvas jspdf shadcn
-  - yarn add supabase @supabase/supabase-js
-
-4. Tailwind init:
-  - yarn tailwindcss init -p # หรือ npx tailwindcss init -p, แล้ว configure content paths.
-
-5. Run:
-  - yarn dev
-
-6. Build:
-  - yarn build && yarn start
-7. Login Page:
-  - use existing user and password from ENV key ADMIN_USER and ADMIN_PWD for authentication and test inside the application.
-
-Performance considerations
-- All API calls should be optimized for performance.
-- All Data proocessing must be in server side only.
-- Paginate API calls if many subtasks.
-- Debounce filter/search operations.
-- Cache computed aggregates to avoid reprocessing on UI-only changes.
-- if no data in supabase, show message to sync data from asana and link to /sync page.
-- sync page should show last sync time and status. and sync process should be server-side only. and can be parallel requests for each section,tasks,subtasks to asana api to speed up.
-
-Security
-- Do not expose PAT in client builds. Prefer server-side proxy or Next.js API routes that read PAT from server env and proxy requests. If PAT is client-side, limit scope and rotate regularly.
-
-Deployment
-- Vercel or any Node host. Keep secrets in provider env settings. Enable HTTPS.
-
-Maintenance
-- Provide a cron or webhook-based refresh to keep Local Storage sync up to date. E.g. a Next.js API route /api/sync that triggers data fetch and processing, called periodically (e.g. daily) via an external cron job or Vercel cron. need to create sql for supabase to enable cron job.
-- Document rate limit behavior and error handling.
-
-Notes
-- Prioritize server-side proxy for sensitive tokens.
-- Start with core pages (Header, KpiCards, WeeklySummaryChart, CurrentTasksTable), then add advanced charts and exports iteratively.

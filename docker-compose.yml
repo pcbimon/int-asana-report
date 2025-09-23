@@ -10,15 +10,16 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - ./volumes/db_data:/var/lib/postgresql/data
+      # - db_initial.sql:/docker-entrypoint-initdb.d/db_initial.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}'"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   web:
     build:
-      context: .
+      context: ./web
       dockerfile: Dockerfile
     depends_on:
       db:
@@ -40,5 +41,15 @@ services:
       - "80:80"
     volumes:
       - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+
+  cron:
+    image: alpine:3.19
+    container_name: int-asana-report-cron
+    depends_on:
+      - web
+    volumes:
+      - ./cron/crontab:/etc/crontabs/root:ro
+    command: ["/bin/sh", "-c", "apk add --no-cache curl && crond -f -L /dev/stdout"]
     restart: unless-stopped
 
