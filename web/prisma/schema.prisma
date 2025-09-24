@@ -11,9 +11,8 @@ datasource db {
 
 model assignees {
   email          String           @id(map: "assignees_pk")
-  firstname      String
-  lastname       String
   assignee_gid   String?          @unique(map: "assignees_uq_gid")
+  mas_user       mas_user         @relation(fields: [email], references: [email], onDelete: NoAction, onUpdate: NoAction, map: "assignees_mas_user_email_fk")
   subtasks       subtasks[]
   task_followers task_followers[]
 }
@@ -73,6 +72,7 @@ model mas_user {
   lastname       String?
   deptid         String?
   nickname       String?
+  assignees      assignees?
   mas_department mas_department? @relation(fields: [deptid], references: [deptid], onDelete: NoAction, onUpdate: NoAction, map: "mas_user_mas_department_deptid_fk")
 }
 

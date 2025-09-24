@@ -1,5 +1,6 @@
 import axios, { AxiosError, AxiosInstance } from "axios";
-import prisma from "@/lib/prisma";
+import prisma from "./prisma";
+import { encrypt } from "./crypto";
 
 const ASANA_BASE_URL = process.env.ASANA_BASE_URL || "https://app.asana.com/api/1.0";
 const ASANA_TOKEN = process.env.ASANA_TOKEN as string;
@@ -90,11 +91,10 @@ export async function syncFromAsana() {
     const teamUsers: AsanaUser[] = await paginate<AsanaUser>(client, `/teams/${ASANA_TEAM_ID}/users`, { params: { opt_fields: "email,name" } });
     // Upsert to avoid breaking references
     for (const u of teamUsers) {
-      const [firstname = "", lastname = ""] = (u.name ?? "").split(" ");
       await prisma.assignees.upsert({
         where: { email: u.email ?? `${u.gid}@asana.local` },
-        update: { assignee_gid: u.gid, firstname, lastname },
-        create: { email: u.email ?? `${u.gid}@asana.local`, assignee_gid: u.gid, firstname, lastname },
+        update: { assignee_gid: u.gid },
+        create: { email: u.email ?? `${u.gid}@asana.local`, assignee_gid: u.gid},
       });
     }
   }
@@ -290,7 +290,7 @@ export async function syncFromAsana() {
         if (!existingAssignees.has(f.gid)) continue;
         followerGids.add(f.gid);
       }
-      for (const gid of followerGids) followerRows.push({ task_gid: st.gid, follower_gid: gid });
+      Array.from(followerGids).forEach((gid) => followerRows.push({ task_gid: st.gid, follower_gid: gid }));
     }
   }
 

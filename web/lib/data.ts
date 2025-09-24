@@ -1,6 +1,7 @@
-import prisma from "@/lib/prisma";
-import dayjs from "dayjs";
-import type { StatusFilter, WeeklyPoint, CurrentTaskRow } from "@/lib/types";
+import prisma from "./prisma";
+import { decrypt } from "./crypto";
+import dayjs from 'dayjs';
+import type { StatusFilter, WeeklyPoint, CurrentTaskRow } from "./types";
 
 export async function getAssignees() {
   const assignees = await prisma.view_user_assignee.findMany({
@@ -10,7 +11,7 @@ export async function getAssignees() {
   });
 
   // Get department names for all unique deptids
-  const deptIds = [...new Set(assignees.map(a => a.deptid).filter((id): id is string => id !== null))];
+  const deptIds = Array.from(new Set(assignees.map(a => a.deptid).filter((id): id is string => id !== null)));
   const departments = await prisma.mas_department.findMany({
     where: { deptid: { in: deptIds } },
     select: { deptid: true, name: true },
@@ -20,6 +21,9 @@ export async function getAssignees() {
 
   return assignees.map(assignee => ({
     ...assignee,
+    // Decrypt names stored as Base64-encrypted blobs
+    firstname: assignee.firstname ? decrypt(assignee.firstname) : '',
+    lastname: assignee.lastname ? decrypt(assignee.lastname) : '',
     departmentName: assignee.deptid ? deptMap.get(assignee.deptid) || 'ไม่ระบุแผนก' : 'ไม่ระบุแผนก'
   }));
 }
@@ -30,9 +34,12 @@ export async function getLastSync() {
 }
 
 export async function getAssigneeByGid(assigneeGid: string) {
-  const a = await prisma.assignees.findFirst({ where: { assignee_gid: assigneeGid }, select: { firstname: true, lastname: true, email: true } });
+  const a = await prisma.view_user_assignee.findFirst(
+    { where: { 
+      assignee_gid: assigneeGid 
+    }});
   if (!a) return null;
-  const name = `${a.firstname ?? ""} ${a.lastname ?? ""}`.trim();
+  const name = `${a.firstname ? decrypt(a.firstname) : ''} ${a.lastname ? decrypt(a.lastname) : ''}`.trim();
   return { name, email: a.email };
 }
 
@@ -97,7 +104,7 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
       completed: true,
       due_on: true,
       tasks: { select: { gid: true, name: true, week_startdate: true, due_on: true } },
-  task_followers: { select: { follower_gid: true, assignees: { select: { firstname: true, lastname: true } } } },
+      task_followers: { select: { follower_gid: true, assignees: { select: { mas_user: { select: { firstname: true, lastname: true } } } } } },
     },
     orderBy: { tasks: { week_startdate: "asc" } },
   });
@@ -135,9 +142,9 @@ export async function getWeeklySummary(assigneeGid: string): Promise<WeeklyPoint
 
   type ExtendedPoint = WeeklyPoint & { _ws?: string | null };
   const result: ExtendedPoint[] = [];
-  for (const [, v] of byWeek) {
+  for (const v of Array.from(byWeek.values())) {
     if (v.assigned + v.collab + v.completed + v.overdue === 0) continue;
-  result.push({ week: v.label, assigned: v.assigned, completed: v.completed, overdue: v.overdue, collab: v.collab, expected: v.expected, _ws: v._ws ? new Date(v._ws).toISOString() : null });
+    result.push({ week: v.label, assigned: v.assigned, completed: v.completed, overdue: v.overdue, collab: v.collab, expected: v.expected, _ws: v._ws ? new Date(v._ws).toISOString() : null });
   }
 
   // Sort by _week_startdate ascending (nulls go last)
@@ -221,7 +228,7 @@ export async function getCurrentTasks(
       created_at: true,
       due_on: true,
       tasks: { select: { gid: true, name: true, due_on: true, week_startdate: true } },
-      task_followers: { select: { follower_gid: true, assignees: { select: { firstname: true, lastname: true } } } },
+      task_followers: { select: { follower_gid: true, assignees: { select: { mas_user: { select: { firstname: true, lastname: true } } } } } },
     },
     // Order by parent task week_startdate (desc) first, then by completion (completed first).
     // To approximate Overdue before Pending within incomplete tasks, order by tasks.due_on asc
@@ -241,7 +248,7 @@ export async function getCurrentTasks(
   const mapped: CurrentTaskRow[] = dbRows.map((st) => {
     const followers = (st.task_followers ?? []).map((f) => {
       const a = f.assignees;
-      return { gid: f.follower_gid, first_name: a?.firstname ?? "", last_name: a?.lastname ?? "" };
+      return { gid: f.follower_gid, first_name: a?.mas_user.firstname ? decrypt(a.mas_user.firstname) : "", last_name: a?.mas_user.lastname ? decrypt(a.mas_user.lastname) : "" };
     });
     const isFollower = followers.some((f) => f.gid === assigneeGid);
     const type: CurrentTaskRow['type'] = st.assignee_gid === assigneeGid ? 'Owner' : isFollower ? 'Collaborator' : 'Owner';
