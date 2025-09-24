@@ -1,0 +1,5 @@
+email,firstname,lastname,nickname,deptid
+john.doe@example.com,John,Doe,Johnny,CS001
+jane.smith@example.com,Jane,Smith,Janie,CS002
+bob.wilson@example.com,Bob,Wilson,Bobby,
+admin@example.com,Admin,User,,CS001

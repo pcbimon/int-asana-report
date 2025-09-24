@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Upload } from 'lucide-react'
 import { UserTable } from './UserTable'
 import { UserDialog } from './UserDialog'
+import { CSVImportDialog } from './CSVImportDialog'
 
 interface User {
   email: string
@@ -45,6 +46,7 @@ export function UserManagement() {
   const [isLoading, setIsLoading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [isCsvImportOpen, setIsCsvImportOpen] = useState(false)
 
   // Fetch users
   const fetchUsers = async (page = 1, searchTerm = search) => {
@@ -150,6 +152,45 @@ export function UserManagement() {
     setIsDialogOpen(true)
   }
 
+  // Handle CSV import
+  const handleCsvImport = async (users: { email: string; firstname?: string; lastname?: string; nickname?: string; deptid?: string }[]) => {
+    try {
+      const response = await fetch('/api/users/bulk-import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ users }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to import users')
+      }
+
+      const result = await response.json()
+      
+      // Refresh the user list
+      await fetchUsers(1)
+      
+      // Show success message with import results
+      if (result.result.failed > 0) {
+        const errorMessage = result.result.errors
+          .slice(0, 5) // Show first 5 errors
+          .map((err: { row: number; email: string; error: string }) => `Row ${err.row} (${err.email}): ${err.error}`)
+          .join('\n')
+        
+        alert(`Import completed with some errors:\n${result.message}\n\nFirst few errors:\n${errorMessage}`)
+      } else {
+        alert(`Import successful: ${result.message}`)
+      }
+      
+    } catch (error) {
+      console.error('Error importing users:', error)
+      throw error
+    }
+  }
+
   // Initial load
   useEffect(() => {
     fetchUsers()
@@ -177,15 +218,24 @@ export function UserManagement() {
                 className="pl-10"
               />
             </div>
-            <Button
-              onClick={() => {
-                setEditingUser(null)
-                setIsDialogOpen(true)
-              }}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsCsvImportOpen(true)}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import CSV
+              </Button>
+              <Button
+                onClick={() => {
+                  setEditingUser(null)
+                  setIsDialogOpen(true)
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </div>
           </div>
 
           {/* User Table */}
@@ -210,6 +260,13 @@ export function UserManagement() {
         user={editingUser}
         departments={departments}
         onSave={handleUserSave}
+      />
+
+      {/* CSV Import Dialog */}
+      <CSVImportDialog
+        isOpen={isCsvImportOpen}
+        onClose={() => setIsCsvImportOpen(false)}
+        onImport={handleCsvImport}
       />
     </Card>
   )
