@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { encrypt, decrypt } from '@/lib/crypto'
 
 // GET /api/users/[email] - Get a specific user
 export async function GET(
@@ -29,7 +30,17 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ user })
+    // Decrypt name fields before returning to the client. If decryption fails
+    // the decrypt function returns the original value, which preserves
+    // compatibility with plaintext-stored values.
+    const safeUser = {
+      ...user,
+      firstname: user.firstname ? decrypt(user.firstname) : user.firstname,
+      lastname: user.lastname ? decrypt(user.lastname) : user.lastname,
+      nickname: user.nickname ? decrypt(user.nickname) : user.nickname,
+    }
+
+    return NextResponse.json({ user: safeUser })
   } catch (error) {
     console.error('Error fetching user:', error)
     return NextResponse.json(
@@ -48,7 +59,7 @@ export async function PUT(
     const { email } = await params
     const decodedEmail = decodeURIComponent(email)
     const body = await request.json()
-    const { firstname, lastname, nickname, departmentid } = body
+  const { firstname, lastname, nickname, departmentid } = body
 
     // Check if user exists
     const existingUser = await prisma.mas_user.findUnique({
@@ -62,15 +73,20 @@ export async function PUT(
       )
     }
 
+    // Encrypt name fields before saving. Only encrypt when a field is provided
+    // (not undefined). Use the encrypt helper which will throw if keys are
+    // missing — let that surface as a 500 so the caller knows encryption is
+    // misconfigured.
+    const dataToUpdate: Record<string, any> = {}
+    if (firstname !== undefined) dataToUpdate.firstname = firstname === null ? null : encrypt(String(firstname))
+    if (lastname !== undefined) dataToUpdate.lastname = lastname === null ? null : encrypt(String(lastname))
+    if (nickname !== undefined) dataToUpdate.nickname = nickname === null ? null : encrypt(String(nickname))
+    if (departmentid !== undefined) dataToUpdate.deptid = departmentid
+
     // Update user
     const user = await prisma.mas_user.update({
       where: { email: decodedEmail },
-      data: {
-        firstname: firstname !== undefined ? firstname : undefined,
-        lastname: lastname !== undefined ? lastname : undefined,
-        nickname: nickname !== undefined ? nickname : undefined,
-        deptid: departmentid !== undefined ? departmentid : undefined,
-      },
+      data: dataToUpdate,
       include: {
         mas_department: {
           select: {
@@ -81,7 +97,15 @@ export async function PUT(
       },
     })
 
-    return NextResponse.json({ user })
+    // Decrypt returned fields for the response
+    const safeUser = {
+      ...user,
+      firstname: user.firstname ? decrypt(user.firstname) : user.firstname,
+      lastname: user.lastname ? decrypt(user.lastname) : user.lastname,
+      nickname: user.nickname ? decrypt(user.nickname) : user.nickname,
+    }
+
+    return NextResponse.json({ user: safeUser })
   } catch (error) {
     console.error('Error updating user:', error)
     return NextResponse.json(
