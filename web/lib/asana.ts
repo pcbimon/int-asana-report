@@ -1,6 +1,5 @@
 import axios, { AxiosError, AxiosInstance } from "axios";
 import prisma from "./prisma";
-import { encrypt } from "./crypto";
 
 const ASANA_BASE_URL = process.env.ASANA_BASE_URL || "https://app.asana.com/api/1.0";
 const ASANA_TOKEN = process.env.ASANA_TOKEN as string;
