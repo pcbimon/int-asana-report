@@ -88,8 +88,15 @@ export async function syncFromAsana() {
   if (ASANA_TEAM_ID) {
     console.log(`[asana] fetching team users for team ${ASANA_TEAM_ID}`);
     const teamUsers: AsanaUser[] = await paginate<AsanaUser>(client, `/teams/${ASANA_TEAM_ID}/users`, { params: { opt_fields: "email,name" } });
+    
+    // filter only users from mas_user
+    const masUsers = await prisma.mas_user.findMany({ select: { email: true } });
+    const masUserEmails = new Set(masUsers.map(u => u.email.toLowerCase()));
+    const filteredTeamUsers = teamUsers.filter(u => u.email && masUserEmails.has(u.email.toLowerCase()));
+    console.log(`[asana] filtered team users to ${filteredTeamUsers.length} users present in mas_user table`);
+    
     // Upsert to avoid breaking references
-    for (const u of teamUsers) {
+    for (const u of filteredTeamUsers) {
       await prisma.assignees.upsert({
         where: { email: u.email ?? `${u.gid}@asana.local` },
         update: { assignee_gid: u.gid },
