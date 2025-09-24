@@ -51,6 +51,9 @@ export function CSVImportDialog({
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // dialog width: default 1/2, expand to 3/4 for preview step for more horizontal space
+  const dialogWidthClass = step === 'preview' ? 'threeQuarter' : 'md'
+
   const resetDialog = useCallback(() => {
     setStep('upload')
     setCsvData(null)
@@ -263,7 +266,9 @@ export function CSVImportDialog({
   )
 
   const renderPreviewStep = () => {
-    const previewData = csvData?.rows.slice(0, 5) || []
+    // Show a larger preview (first 20 rows) for better visibility
+    const PREVIEW_COUNT = 20
+    const previewData = csvData?.rows.slice(0, PREVIEW_COUNT) || []
     
     return (
       <div className="space-y-4">
@@ -276,16 +281,17 @@ export function CSVImportDialog({
           <CardHeader>
             <CardTitle className="text-base">Data Preview</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+          {/* Make the preview area taller and scrollable */}
+          <CardContent className="max-h-[40vh] overflow-y-auto w-full">
+            <div className="overflow-x-auto min-w-full">
+              <table className="w-full text-sm table-fixed">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-2">Email</th>
-                    <th className="text-left p-2">First Name</th>
-                    <th className="text-left p-2">Last Name</th>
-                    <th className="text-left p-2">Nickname</th>
-                    <th className="text-left p-2">Department</th>
+                    <th className="text-left p-2 w-[30%]">Email</th>
+                    <th className="text-left p-2 w-[17%]">First Name</th>
+                    <th className="text-left p-2 w-[17%]">Last Name</th>
+                    <th className="text-left p-2 w-[18%]">Nickname</th>
+                    <th className="text-left p-2 w-[18%]">Department</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -326,7 +332,7 @@ export function CSVImportDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent size={dialogWidthClass} className={`mx-auto max-h-[80vh] overflow-y-auto`}>
         <DialogHeader>
           <DialogTitle>{getStepTitle()}</DialogTitle>
         </DialogHeader>
