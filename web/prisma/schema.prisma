@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  provider        = "prisma-client-js"
+  output          = "../generated/prisma"
+  previewFeatures = ["views"]
 }
 
 datasource db {
@@ -31,10 +32,10 @@ model subtasks {
   completed       Boolean?
   created_at      DateTime?        @db.Timestamptz(6)
   completed_at    DateTime?        @db.Timestamptz(6)
+  due_on          DateTime?        @db.Timestamptz(6)
   assignees       assignees?       @relation(fields: [assignee_gid], references: [assignee_gid], onDelete: NoAction, onUpdate: NoAction, map: "subtasks_assignees_assignee_gid_fk")
   tasks           tasks?           @relation(fields: [parent_task_gid], references: [gid], onDelete: NoAction, onUpdate: NoAction, map: "subtasks_tasks_gid_fk")
   task_followers  task_followers[]
-  due_on          DateTime?         @db.Timestamptz(6)
 }
 
 model sync_metadata {
@@ -53,15 +54,32 @@ model task_followers {
 }
 
 model tasks {
-  gid          String     @id(map: "tasks_pk")
-  name         String?
-  section_gid  String?
-  completed    Boolean?
-  completed_at DateTime?  @db.Timestamptz(6)
-  due_on       DateTime?  @db.Timestamptz(6)
-  project      String?
-  created_at   DateTime?  @db.Timestamptz(6)
-  subtasks     subtasks[]
-  week_startdate  DateTime  @db.Timestamptz(6)
-  sections     sections?  @relation(fields: [section_gid], references: [gid], onDelete: NoAction, onUpdate: NoAction, map: "tasks_sections_gid_fk")
+  gid            String     @id(map: "tasks_pk")
+  name           String?
+  section_gid    String?
+  completed      Boolean?
+  completed_at   DateTime?  @db.Timestamptz(6)
+  due_on         DateTime?  @db.Timestamptz(6)
+  project        String?
+  created_at     DateTime?  @db.Timestamptz(6)
+  week_startdate DateTime   @db.Timestamptz(6)
+  subtasks       subtasks[]
+  sections       sections?  @relation(fields: [section_gid], references: [gid], onDelete: NoAction, onUpdate: NoAction, map: "tasks_sections_gid_fk")
+}
+
+model mas_user {
+  email     String  @id(map: "mas_user_pk")
+  firstname String?
+  lastname  String?
+  deptid    String?
+  nickname  String?
+}
+
+view view_user_assignee {
+  email        String?
+  firstname    String?
+  lastname     String?
+  deptid       String?
+  nickname     String?
+  assignee_gid String?
 }
