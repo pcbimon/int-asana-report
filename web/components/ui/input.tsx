@@ -3,6 +3,15 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+  // Ensure `value` is never null. React warns when `value` is null — prefer
+  // an empty string for controlled inputs. If callers pass `value: null`,
+  // coerce it to '' here so components don't need to guard everywhere.
+  // Use `Partial` + `unknown` to avoid `any` and satisfy eslint rules.
+  const safeProps = { ...props } as Partial<React.ComponentProps<'input'>> & { value?: unknown }
+  if (Object.prototype.hasOwnProperty.call(safeProps, 'value') && safeProps.value == null) {
+    ;(safeProps as Partial<React.ComponentProps<'input'>> & { value?: string }).value = ''
+  }
+
   return (
     <input
       type={type}
@@ -13,7 +22,7 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
         "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
         className
       )}
-      {...props}
+  {...(safeProps as React.ComponentProps<'input'>)}
     />
   )
 }

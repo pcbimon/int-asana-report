@@ -11,14 +11,14 @@ export async function GET(request: Request) {
     const search = searchParams.get('search') || ''
     const skip = (page - 1) * limit
 
-    // Build where condition for search. We can search by email at the DB level.
+  // Build where condition for search. We can search by email at the DB level.
     // However firstname/lastname/nickname are stored encrypted, so we cannot
     // reliably search them with a SQL `contains` on ciphertext. Strategy:
     // - If search is provided, include email search in the DB query and then
     //   perform an in-memory filter on decrypted name fields to match the
     //   plaintext search term. This is less efficient but keeps behavior
     //   correct without adding a search index/migration.
-    const where: any = search
+    const where: Record<string, unknown> = search
       ? {
           OR: [{ email: { contains: search, mode: 'insensitive' as const } }],
         }
@@ -97,8 +97,14 @@ export async function GET(request: Request) {
 // POST /api/users - Create new user
 export async function POST(request: Request) {
   try {
-  const body = await request.json()
-  const { email, firstname, lastname, nickname, departmentid } = body
+    const body = await request.json() as {
+      email?: string
+      firstname?: string | null
+      lastname?: string | null
+      nickname?: string | null
+      departmentid?: string | null
+    }
+    const { email, firstname, lastname, nickname, departmentid } = body
 
     // Validate required fields
     if (!email) {

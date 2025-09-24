@@ -58,8 +58,13 @@ export async function PUT(
   try {
     const { email } = await params
     const decodedEmail = decodeURIComponent(email)
-    const body = await request.json()
-  const { firstname, lastname, nickname, departmentid } = body
+    const body = await request.json() as {
+      firstname?: string | null
+      lastname?: string | null
+      nickname?: string | null
+      departmentid?: string | null
+    }
+    const { firstname, lastname, nickname, departmentid } = body
 
     // Check if user exists
     const existingUser = await prisma.mas_user.findUnique({
@@ -77,7 +82,7 @@ export async function PUT(
     // (not undefined). Use the encrypt helper which will throw if keys are
     // missing — let that surface as a 500 so the caller knows encryption is
     // misconfigured.
-    const dataToUpdate: Record<string, any> = {}
+  const dataToUpdate: Record<string, unknown> = {}
     if (firstname !== undefined) dataToUpdate.firstname = firstname === null ? null : encrypt(String(firstname))
     if (lastname !== undefined) dataToUpdate.lastname = lastname === null ? null : encrypt(String(lastname))
     if (nickname !== undefined) dataToUpdate.nickname = nickname === null ? null : encrypt(String(nickname))

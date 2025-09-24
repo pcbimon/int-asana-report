@@ -121,7 +121,7 @@ export function UserDialog({
             <Input
               id="email"
               type="email"
-              value={formData.email}
+              value={formData.email || ''}
               onChange={(e) => handleInputChange('email', e.target.value)}
               disabled={!!user || isLoading} // Disable editing email for existing users
               required
