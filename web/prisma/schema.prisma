@@ -68,11 +68,18 @@ model tasks {
 }
 
 model mas_user {
-  email     String  @id(map: "mas_user_pk")
-  firstname String?
-  lastname  String?
-  deptid    String?
-  nickname  String?
+  email          String          @id(map: "mas_user_pk")
+  firstname      String?
+  lastname       String?
+  deptid         String?
+  nickname       String?
+  mas_department mas_department? @relation(fields: [deptid], references: [deptid], onDelete: NoAction, onUpdate: NoAction, map: "mas_user_mas_department_deptid_fk")
+}
+
+model mas_department {
+  deptid   String     @id(map: "mas_department_pk")
+  name     String?
+  mas_user mas_user[]
 }
 
 view view_user_assignee {
