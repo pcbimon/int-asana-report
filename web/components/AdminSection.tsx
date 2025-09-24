@@ -18,7 +18,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export type AssigneeOption = { name: string; value: string };
+export type AssigneeOption = { 
+  name: string; 
+  value: string; 
+  deptid?: string | null; 
+  departmentName?: string; 
+};
 
 export default function AdminSection({
   assignees,
@@ -33,6 +38,30 @@ export default function AdminSection({
   const id = React.useId();
   // selectedAssignee by name (value stores name for search friendliness)
   const selectedAssignee = assignees.find((assignee) => assignee.name === value);
+  
+  // Group assignees by department
+  const groupedAssignees = React.useMemo(() => {
+    const groups = new Map<string, AssigneeOption[]>();
+    
+    assignees.forEach(assignee => {
+      const deptName = assignee.departmentName || 'ไม่ระบุแผนก';
+      if (!groups.has(deptName)) {
+        groups.set(deptName, []);
+      }
+      groups.get(deptName)!.push(assignee);
+    });
+    
+    // Sort departments by name, and assignees within each department
+    const sortedGroups = Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b, 'th'))
+      .map(([deptName, assigneeList]) => [
+        deptName,
+        assigneeList.sort((a, b) => a.name.localeCompare(b.name, 'th'))
+      ] as const);
+    
+    return sortedGroups;
+  }, [assignees]);
+  
   // when active gid or assignees change, set the displayed value to the matching name
   React.useEffect(() => {
     if (!activeAssigneeGid) {
@@ -66,8 +95,9 @@ export default function AdminSection({
               <CommandInput placeholder="Search assignee..." className="h-9" />
               <CommandList>
                 <CommandEmpty>No assignee found.</CommandEmpty>
-                <CommandGroup>
-                    {assignees.map((assignee) => (
+                {groupedAssignees.map(([deptName, deptAssignees]) => (
+                  <CommandGroup key={deptName} heading={deptName}>
+                    {deptAssignees.map((assignee) => (
                       <CommandItem
                         key={assignee.value}
                         value={assignee.name}
@@ -89,7 +119,8 @@ export default function AdminSection({
                         />
                       </CommandItem>
                     ))}
-                </CommandGroup>
+                  </CommandGroup>
+                ))}
               </CommandList>
             </Command>
           </PopoverContent>

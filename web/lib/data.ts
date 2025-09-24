@@ -3,11 +3,25 @@ import dayjs from "dayjs";
 import type { StatusFilter, WeeklyPoint, CurrentTaskRow } from "@/lib/types";
 
 export async function getAssignees() {
-  return prisma.view_user_assignee.findMany({
+  const assignees = await prisma.view_user_assignee.findMany({
     where: { assignee_gid: { not: null } },
-    select: { assignee_gid: true, firstname: true, lastname: true, email: true },
+    select: { assignee_gid: true, firstname: true, lastname: true, email: true, deptid: true },
     orderBy: [{ firstname: "asc" }, { lastname: "asc" }],
   });
+
+  // Get department names for all unique deptids
+  const deptIds = [...new Set(assignees.map(a => a.deptid).filter((id): id is string => id !== null))];
+  const departments = await prisma.mas_department.findMany({
+    where: { deptid: { in: deptIds } },
+    select: { deptid: true, name: true },
+  });
+
+  const deptMap = new Map(departments.map(d => [d.deptid, d.name]));
+
+  return assignees.map(assignee => ({
+    ...assignee,
+    departmentName: assignee.deptid ? deptMap.get(assignee.deptid) || 'ไม่ระบุแผนก' : 'ไม่ระบุแผนก'
+  }));
 }
 
 export async function getLastSync() {

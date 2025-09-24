@@ -24,7 +24,12 @@ export default async function DashboardPage({ params }: { params: { "assignee-gi
 
   // fetch assignees server-side and format for the AdminSection
   const rawAssignees = await getAssignees();
-  const assigneeOptions = rawAssignees.map((a) => ({ name: `${a.firstname} ${a.lastname}`.trim(), value: a.assignee_gid! }));
+  const assigneeOptions = rawAssignees.map((a) => ({ 
+    name: `${a.firstname} ${a.lastname}`.trim(), 
+    value: a.assignee_gid!, 
+    deptid: a.deptid,
+    departmentName: a.departmentName 
+  }));
 
   const showAdmin = process.env.NEXT_PUBLIC_SHOW_ADMIN === '1';
 
