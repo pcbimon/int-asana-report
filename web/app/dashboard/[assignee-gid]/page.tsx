@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { MdLogout } from "react-icons/md";
 import { FaFileExcel, FaFilePdf } from "react-icons/fa";
 import React from "react";
-import "../../globals.css";
+// global styles should be imported in app/layout.tsx (global CSS can only be imported from the root layout)
 import SummaryMetricCard from "@/components/SummaryMatricCard";
 import WeeklySummaryChart from "@/components/WeeklySummaryChart";
 import CurrentTasksTable from "@/components/CurrentTasksTable";
