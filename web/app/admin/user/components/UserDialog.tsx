@@ -90,9 +90,13 @@ export function UserDialog({
   }
 
   const handleInputChange = (field: keyof User, value: string) => {
+    // Radix Select treats an empty string as the "clear" value. The Select primitive
+    // throws if an Item is rendered with value="". Use a sentinel "__none" value
+    // for the placeholder option and map it back to null in the form state.
+    const mapped = value === '__none' || value === '' ? null : value
     setFormData(prev => ({
       ...prev,
-      [field]: value || null,
+      [field]: mapped,
     }))
   }
 
@@ -157,7 +161,9 @@ export function UserDialog({
           <div className="space-y-2">
             <Label htmlFor="department">Department</Label>
             <Select
-              value={formData.deptid || ''}
+              // Use the sentinel '__none' when deptid is null/empty so we don't render
+              // an Item with an empty string as value (Radix will throw).
+              value={formData.deptid || '__none'}
               onValueChange={(value) => handleInputChange('deptid', value)}
               disabled={isLoading}
             >
@@ -165,7 +171,7 @@ export function UserDialog({
                 <SelectValue placeholder="Select Department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Select Department</SelectItem>
+                <SelectItem value="__none">Select Department</SelectItem>
                 {departments.map((dept) => (
                   <SelectItem key={dept.deptid} value={dept.deptid}>
                     {dept.name || dept.deptid}
