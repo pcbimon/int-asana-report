@@ -11,8 +11,10 @@ import AdminSection from "@/components/AdminSection";
 import { getAssigneeByGid, getLastSync, getSummaryMetrics, getWeeklySummary, getAssignees } from "@/lib/data";
 import { redirect } from "next/navigation";
 
-export default async function DashboardPage({ params }: { params: { "assignee-gid": string } }) {
-  const assigneeGid = params["assignee-gid"];
+export default async function DashboardPage({ params }: { params: unknown }) {
+  // Next.js may provide `params` as a thenable; await it before accessing properties.
+  const resolvedParams = (await params) as { "assignee-gid"?: string };
+  const assigneeGid = resolvedParams["assignee-gid"];
   if (!assigneeGid) redirect("/");
 
   const [metrics, weekly, lastSync, assignee] = await Promise.all([
