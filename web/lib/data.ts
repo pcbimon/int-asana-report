@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import type { StatusFilter, WeeklyPoint, CurrentTaskRow } from "@/lib/types";
 
 export async function getAssignees() {
-  return prisma.assignees.findMany({
+  return prisma.view_user_assignee.findMany({
     where: { assignee_gid: { not: null } },
     select: { assignee_gid: true, firstname: true, lastname: true, email: true },
     orderBy: [{ firstname: "asc" }, { lastname: "asc" }],
